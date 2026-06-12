@@ -183,7 +183,7 @@ const CSS = `
 .wm {
   --bg:#EBEEF3; --panel:#FFFFFF; --ink:#172029; --muted:#6A7886; --faint:#9AA7B4;
   --line:#E2E8EE; --brand:#0E8C7F; --brand-dk:#0A6B61; --brand-rgb:14,140,127;
-  --amber:#D98A24; --bad:#C24B3A; --shadow:0 1px 2px rgba(23,32,41,.05),0 8px 24px rgba(23,32,41,.06);
+  --amber:#D98A24; --bad:#C24B3A; --clay:#C2603C; --shadow:0 1px 2px rgba(23,32,41,.05),0 8px 24px rgba(23,32,41,.06);
   font-family:'Pretendard',-apple-system,BlinkMacSystemFont,'Apple SD Gothic Neo','Malgun Gothic','Segoe UI',sans-serif;
   color:var(--ink); background:var(--bg); min-height:100vh; line-height:1.5; -webkit-font-smoothing:antialiased;
 }
@@ -213,6 +213,7 @@ const CSS = `
 .wm-list { display:flex; flex-direction:column; gap:12px; }
 .wm-mcard { padding:18px 20px; cursor:pointer; transition:border-color .15s, transform .08s; }
 .wm-mcard:hover { border-color:#C7D3DC; transform:translateY(-1px); }
+.wm-acc { width:100%; text-align:left; background:none; border:none; font-family:inherit; cursor:pointer; padding:0; color:inherit; }
 .wm-titlerow { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
 .wm-mtitle { font-size:17px; font-weight:750; letter-spacing:-.02em; margin:0; }
 .wm-type { font-size:11px; font-weight:700; padding:3px 8px; border-radius:7px; letter-spacing:-.01em;
@@ -337,6 +338,35 @@ textarea.wm-input { resize:vertical; min-height:64px; }
 .wm-popitem:hover { background:#F1F4F7; }
 .wm-backdrop { position:fixed; inset:0; z-index:39; }
 .wm-footer { text-align:center; font-size:12px; color:var(--faint); margin-top:36px; }
+/* ── brick style (메인 화면) ── */
+.wm-hero { position:relative; overflow:hidden; background:#FFFDF8; color:var(--ink); border:2.5px solid var(--ink);
+  border-radius:16px; padding:30px 28px; box-shadow:8px 8px 0 rgba(14,140,127,.85); }
+.wm-hero::before { content:""; position:absolute; inset:0; opacity:.06; pointer-events:none;
+  background-image:
+    linear-gradient(#172029 2px, transparent 2px),
+    linear-gradient(90deg, #172029 2px, transparent 2px),
+    linear-gradient(90deg, #172029 2px, transparent 2px);
+  background-size:100% 30px, 60px 30px, 60px 30px;
+  background-position:0 0, 0 0, 30px 15px; }
+.wm-hero > * { position:relative; z-index:1; }
+.wm-hero h2 { font-size:32px; font-weight:850; letter-spacing:-.045em; margin:0; color:var(--ink); }
+.wm-hero h2 b { color:var(--brand); }
+.wm-hero .tag { font-size:13px; color:var(--muted); font-weight:600; margin-top:4px; }
+.wm-hero p { font-size:13.5px; color:#3D4853; line-height:1.7; margin:16px 0 0; }
+.wm-hero p b { color:var(--brand-dk); font-weight:700; }
+.wm-bricklabel { display:inline-block; background:#fff; color:var(--ink); border:2px solid var(--ink); font-size:11.5px; font-weight:700;
+  letter-spacing:-.01em; padding:5px 12px; border-radius:8px; box-shadow:3px 3px 0 rgba(14,140,127,.85); margin:0 0 16px 3px; }
+.wm-bricklist { display:flex; flex-direction:column; gap:14px; }
+.wm-brickcard { background:#fff; border:2px solid var(--ink); border-left:7px solid var(--brand); border-radius:12px;
+  box-shadow:5px 5px 0 rgba(23,32,41,.16); overflow:hidden; transition:transform .1s ease, box-shadow .1s ease; }
+.wm-brickcard.alt { border-left-color:var(--clay); box-shadow:5px 5px 0 rgba(194,96,60,.3); }
+.wm-brickcard:hover { transform:translate(-1px,-1px); box-shadow:7px 7px 0 rgba(23,32,41,.2); }
+.wm-brickcard.alt:hover { box-shadow:7px 7px 0 rgba(194,96,60,.38); }
+.wm-brickcard .wm-acc { padding:15px 18px; }
+.wm-brickfoot { padding:0 18px 16px; }
+.wm-brickempty { background:#fff; border:2px dashed var(--line); border-radius:12px; padding:36px 20px;
+  text-align:center; color:var(--muted); font-size:13.5px; margin-top:18px; }
+@media (max-width:560px){ .wm-hero h2 { font-size:27px; } .wm-hero { box-shadow:6px 6px 0 rgba(14,140,127,.92); } }
 .wm-drop { display:flex; align-items:center; justify-content:center; gap:8px; text-align:center; cursor:pointer; border:1.5px dashed var(--line); border-radius:12px; padding:16px; font-size:13px; color:var(--muted); background:#F8FAFB; transition:.15s; line-height:1.5; }
 .wm-drop:hover { border-color:var(--brand); color:var(--brand-dk); background:rgba(var(--brand-rgb),.05); }
 @media (max-width:560px){ .wm-slotrow { flex-wrap:wrap; } .wm-slotrow .wm-input { flex:1 1 40%; } }
@@ -378,18 +408,18 @@ export default function App() {
     } catch {}
   }, [host, hostPin, guestCode]);
 
-  const openByCode = async (code) => {
+  const openByCode = async (code, expectId) => {
     const c = (code || "").trim().toUpperCase();
     if (!c) return false;
     try {
       const d = await apiGetByCode(c);
-      if (d && d.ok) {
+      if (d && d.ok && (!expectId || d.meeting.id === expectId)) {
         setGuestCode(c); setMode("guest");
         setData({ meetings: [normM(d.meeting)], responses: (d.responses || []).map(normResp) });
         setCurId(d.meeting.id); setView("detail");
         return true;
       }
-      flash("그 코드의 모임을 찾지 못했어요");
+      flash(expectId ? "코드가 이 모임과 일치하지 않아요" : "그 코드의 모임을 찾지 못했어요");
     } catch { flash("서버 연결을 확인해 주세요"); }
     return false;
   };
@@ -455,7 +485,7 @@ export default function App() {
   const goHome = async () => {
     setCurId(null); setView("home");
     if (typeof window !== "undefined" && window.location.hash) window.history.replaceState(null, "", window.location.pathname + window.location.search);
-    if (host) { await loadData(); }
+    if (host) { setGuestCode(null); await loadData(); }
     else { setGuestCode(null); setData({ meetings: [], responses: [] }); }
   };
 
@@ -474,6 +504,8 @@ export default function App() {
         onBack={goHome} onRefresh={loadData}
         onDeleted={async () => { setCurId(null); setView("home"); await loadData(); }} />
     );
+  else if (view === "landing")
+    body = <CodeEntry onEnter={openByCode} />;
   else if (host && view === "create")
     body = (
       <Create onCancel={goHome} flash={flash}
@@ -498,6 +530,11 @@ export default function App() {
           </div>
           <div className="wm-headbtns">
             {host && view === "home" && <button className="wm-btn wm-pri" onClick={() => setView("create")}>+ 새 모임</button>}
+            {host && (view === "home" || view === "landing") && (
+              view === "landing"
+                ? <button className="wm-btn wm-ghost wm-sm" onClick={goHome}>관리자 홈</button>
+                : <button className="wm-btn wm-ghost wm-sm" onClick={() => setView("landing")}>메인 화면</button>
+            )}
             {!host && (
               <div className="wm-menuwrap">
                 <button className="wm-adminbtn" onClick={() => { setLoginOpen((v) => !v); setMenuOpen(false); }}>관리자 로그인</button>
@@ -569,32 +606,49 @@ function Setup({ onSave, current, onClose }) {
 
 /* ───────────────────────── Home ───────────────────────── */
 function CodeEntry({ onEnter }) {
-  const [code, setCode] = useState("");
   const [active, setActive] = useState(null);
+  const [openId, setOpenId] = useState(null);
+  const [code, setCode] = useState("");
   useEffect(() => {
     (async () => { try { const d = await apiPublicList(); setActive(d && d.ok ? d.meetings : []); } catch { setActive([]); } })();
   }, []);
+  const toggle = (id) => { setOpenId((cur) => (cur === id ? null : id)); setCode(""); };
+  const submit = (id) => onEnter(code, id);
   return (
-    <div>
-      <div className="wm-card wm-entry">
-        <h2>초대 코드 입력</h2>
-        <p>주최자에게 받은 참여 코드(또는 링크)로만 입장할 수 있어요.</p>
-        <div className="wm-join">
-          <input className="wm-input" value={code} onChange={(e) => setCode(e.target.value)} onKeyDown={(e) => e.key === "Enter" && onEnter(code)} placeholder="참여 코드" maxLength={6} />
-          <button className="wm-btn wm-pri" disabled={!code.trim()} onClick={() => onEnter(code)}>입장</button>
-        </div>
+    <div className="wm-brick">
+      <div className="wm-hero">
+        <h2>우모<b>가</b></h2>
+        <div className="tag">우리가 모두 가능한 시간</div>
+        <p>여러 사람의 가능한 시간을 모아 <b>모두가 되는 시간</b>을 찾아주는 도구예요. 주최자가 올린 후보 중 가능한 시간을 체크하고, <b>후보에 없으면 내가 가능한 시간을 직접 추가</b>할 수도 있어요. 가장 많이 겹치는 시간이 자동으로 정리되고, 확정된 일정은 <b>구글 캘린더에 등록할 수 있어요</b>.</p>
+        <p>아래 <b>진행 중인 모임</b>을 누르고, 주최자에게 받은 <b>참여 코드</b>를 입력하면 입장합니다. 받은 링크로도 바로 들어갈 수 있어요.</p>
       </div>
+      {active && active.length === 0 && (
+        <div className="wm-brickempty">지금 진행 중인 모임이 없어요.</div>
+      )}
       {active && active.length > 0 && (
-        <div style={{ marginTop: 18 }}>
-          <div className="wm-label" style={{ margin: "0 2px 9px" }}>현재 투표 중인 모임 · 입장하려면 코드가 필요해요</div>
-          <div className="wm-list">
-            {active.map((m) => (
-              <div key={m.code} className="wm-card" style={{ padding: "16px 18px" }}>
-                <div className="wm-titlerow">
-                  {m.type && <span className="wm-type">{TYPE_ICON[m.type] || ""} {m.type}</span>}
-                  <h3 className="wm-mtitle">{m.title}</h3>
-                </div>
-                {m.deadline && <div className="wm-meta"><span className="wm-dl">⏳ {remainText(m.deadline)}</span></div>}
+        <div style={{ marginTop: 22 }}>
+          <span className="wm-bricklabel">현재 투표 중인 모임 · 눌러서 코드 입력</span>
+          <div className="wm-bricklist">
+            {active.map((m, i) => (
+              <div key={m.id} className={"wm-brickcard" + (i % 2 ? " alt" : "")}>
+                <button className="wm-acc" onClick={() => toggle(m.id)}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
+                    <div className="wm-titlerow">
+                      {m.type && <span className="wm-type">{TYPE_ICON[m.type] || ""} {m.type}</span>}
+                      <h3 className="wm-mtitle">{m.title}</h3>
+                    </div>
+                    <span style={{ color: "var(--faint)", fontSize: 12 }}>{openId === m.id ? "▲" : "▼"}</span>
+                  </div>
+                  {m.deadline && <div className="wm-meta" style={{ marginTop: 7 }}><span className="wm-dl">⏳ {remainText(m.deadline)}</span></div>}
+                </button>
+                {openId === m.id && (
+                  <div className="wm-brickfoot">
+                    <div className="wm-join">
+                      <input className="wm-input" value={code} autoFocus onChange={(e) => setCode(e.target.value)} onKeyDown={(e) => e.key === "Enter" && submit(m.id)} placeholder="참여 코드" maxLength={6} />
+                      <button className="wm-btn wm-pri" disabled={!code.trim()} onClick={() => submit(m.id)}>입장</button>
+                    </div>
+                  </div>
+                )}
               </div>
             ))}
           </div>
