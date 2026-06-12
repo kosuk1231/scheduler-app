@@ -15,19 +15,23 @@ async function cfgGet() {
 async function cfgSet(v) { try { await window.storage.set("cfg:gasUrl", v, true); } catch {} }
 
 async function apiPost(payload) {
-  // Content-Type 미지정 → text/plain(단순요청)으로 보내 CORS preflight 회피
-  await fetch(GAS_URL, { method: "POST", body: JSON.stringify(payload) });
+  // 쓰기: text/plain 단순요청(프리플라이트 회피). 응답은 읽지 않으며, 막혀도 무시(쓰기는 서버에서 수행됨)
+  try { await fetch(GAS_URL, { method: "POST", body: JSON.stringify(payload) }); } catch {}
 }
-async function apiPostJson(payload) {
-  const r = await fetch(GAS_URL, { method: "POST", body: JSON.stringify(payload) });
+async function apiGetReq(params) {
+  // 읽기·인증: GET(쿼리스트링) — Apps Script 응답을 브라우저에서 안정적으로 읽기 위해
+  const qs = new URLSearchParams({ ...params, t: Date.now() }).toString();
+  const r = await fetch(GAS_URL + "?" + qs, { method: "GET" });
   return await r.json();
 }
-const apiHostData = (pin) => apiPostJson({ action: "hostData", pin });
-const apiGetByCode = (code) => apiPostJson({ action: "getByCode", code });
+const apiHostData = (pin) => apiGetReq({ action: "hostData", pin });
+const apiGetByCode = (code) => apiGetReq({ action: "getByCode", code });
+const apiPublicList = () => apiGetReq({ action: "publicList" });
+const apiAddHost = (name, newPin, pin) => apiPost({ action: "addHost", name, newPin, pin });
+const apiAddToCalendar = (mtgId, pin) => apiGetReq({ action: "addToCalendar", mtgId, pin });
 const apiSaveMeeting = (m, pin) => apiPost({ action: "saveMeeting", meeting: m, pin });
 const apiDeleteMeeting = (id, pin) => apiPost({ action: "deleteMeeting", id, pin });
 const apiSetFinal = (id, finalSlotId, pin) => apiPost({ action: "setFinal", id, finalSlotId, pin });
-const apiAddToCalendar = (mtgId, pin) => apiPostJson({ action: "addToCalendar", mtgId, pin });
 const apiSaveResponse = (mtgId, name, avail, note) => apiPost({ action: "saveResponse", mtgId, name, avail, note });
 const apiAddSlot = (mtgId, slot) => apiPost({ action: "addSlot", mtgId, slot });
 
@@ -340,6 +344,7 @@ export default function App() {
   const [host, setHost] = useState(false);
   const [hostPin, setHostPin] = useState("");
   const [guestCode, setGuestCode] = useState(null);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [toast, setToast] = useState("");
   const [confirm, setConfirm] = useState(null);
   const [showSetup, setShowSetup] = useState(false);
@@ -352,7 +357,7 @@ export default function App() {
     try {
       if (host && hostPin) {
         const d = await apiHostData(hostPin);
-        if (d.ok) setData(normList(d));
+        if (d.ok) { setData(normList(d)); setIsAdmin(!!d.admin); }
         else { setHost(false); setHostPin(""); lsDel("umoga:pin"); }
       } else if (guestCode) {
         const d = await apiGetByCode(guestCode);
@@ -364,47 +369,56 @@ export default function App() {
   const openByCode = async (code) => {
     const c = (code || "").trim().toUpperCase();
     if (!c) return false;
-    const d = await apiGetByCode(c);
-    if (d && d.ok) {
-      setGuestCode(c); setMode("guest");
-      setData({ meetings: [normM(d.meeting)], responses: (d.responses || []).map(normResp) });
-      setCurId(d.meeting.id); setView("detail");
-      return true;
-    }
-    flash("그 코드의 모임을 찾지 못했어요");
+    try {
+      const d = await apiGetByCode(c);
+      if (d && d.ok) {
+        setGuestCode(c); setMode("guest");
+        setData({ meetings: [normM(d.meeting)], responses: (d.responses || []).map(normResp) });
+        setCurId(d.meeting.id); setView("detail");
+        return true;
+      }
+      flash("그 코드의 모임을 찾지 못했어요");
+    } catch { flash("서버 연결을 확인해 주세요"); }
     return false;
   };
 
   const hostLogin = async (pin) => {
     const pn = (pin || "").trim();
     if (!pn) return;
-    const d = await apiHostData(pn);
-    if (d && d.ok) {
-      setHost(true); setHostPin(pn); lsSet("umoga:pin", pn);
-      setGuestCode(null); setCurId(null); setView("home"); setData(normList(d));
-    } else flash("비밀번호가 올바르지 않아요");
+    try {
+      const d = await apiHostData(pn);
+      if (d && d.ok) {
+        setHost(true); setHostPin(pn); lsSet("umoga:pin", pn); setIsAdmin(!!d.admin);
+        setGuestCode(null); setCurId(null); setView("home"); setData(normList(d));
+      } else flash("비밀번호가 올바르지 않아요");
+    } catch { flash("서버 연결을 확인해 주세요"); }
   };
   const hostLogout = () => {
-    setHost(false); setHostPin(""); lsDel("umoga:pin");
+    setHost(false); setHostPin(""); setIsAdmin(false); lsDel("umoga:pin");
     setGuestCode(null); setCurId(null); setView("home"); setData({ meetings: [], responses: [] });
   };
 
   useEffect(() => {
     (async () => {
-      if (GAS_URL_DEFAULT) { GAS_URL = GAS_URL_DEFAULT; setGasUrl(GAS_URL_DEFAULT); }
-      else {
-        const c = hasWS ? await cfgGet() : "";
-        if (c) { GAS_URL = c; setGasUrl(c); } else { setGasUrl(""); return; }
+      try {
+        if (GAS_URL_DEFAULT) { GAS_URL = GAS_URL_DEFAULT; setGasUrl(GAS_URL_DEFAULT); }
+        else {
+          const c = hasWS ? await cfgGet() : "";
+          if (c) { GAS_URL = c; setGasUrl(c); } else { setGasUrl(""); return; }
+        }
+        const hashCode = readHashCode();
+        if (hashCode) { await openByCode(hashCode); return; }
+        const savedPin = lsGet("umoga:pin");
+        if (savedPin) {
+          const d = await apiHostData(savedPin);
+          if (d && d.ok) { setHost(true); setHostPin(savedPin); setIsAdmin(!!d.admin); setData(normList(d)); return; }
+          lsDel("umoga:pin");
+        }
+        setData({ meetings: [], responses: [] });
+      } catch {
+        setData({ meetings: [], responses: [] });
+        flash("서버 연결을 확인해 주세요");
       }
-      const hashCode = readHashCode();
-      if (hashCode) { await openByCode(hashCode); return; }
-      const savedPin = lsGet("umoga:pin");
-      if (savedPin) {
-        const d = await apiHostData(savedPin);
-        if (d && d.ok) { setHost(true); setHostPin(savedPin); setData(normList(d)); return; }
-        lsDel("umoga:pin");
-      }
-      setData({ meetings: [], responses: [] });
     })();
     // eslint-disable-next-line
   }, []);
@@ -451,7 +465,9 @@ export default function App() {
         onSaved={async (m) => { await apiSaveMeeting(m, hostPin); await loadData(); setCurId(m.id); setMode("host"); setView("detail"); flash("모임을 만들었어요"); }} />
     );
   else if (host)
-    body = <Home meetings={data.meetings} onOpen={(id) => { setMode("host"); setCurId(id); setView("detail"); }} onNew={() => setView("create")} />;
+    body = <Home meetings={data.meetings} isAdmin={isAdmin}
+      onAddHost={async (name, pin) => { await apiAddHost(name, pin, hostPin); flash(name + " 님에게 권한을 줬어요"); }}
+      onOpen={(id) => { setMode("host"); setCurId(id); setView("detail"); }} onNew={() => setView("create")} />;
   else
     body = <CodeEntry onEnter={openByCode} onHostLogin={hostLogin} />;
 
@@ -517,52 +533,91 @@ function CodeEntry({ onEnter, onHostLogin }) {
   const [code, setCode] = useState("");
   const [showHost, setShowHost] = useState(false);
   const [pin, setPin] = useState("");
+  const [active, setActive] = useState(null);
+  useEffect(() => {
+    (async () => { try { const d = await apiPublicList(); setActive(d && d.ok ? d.meetings : []); } catch { setActive([]); } })();
+  }, []);
   return (
-    <div className="wm-card wm-entry">
-      <h2>초대 코드 입력</h2>
-      <p>주최자에게 받은 참여 코드(또는 링크)로만 입장할 수 있어요. 다른 모임은 보이지 않습니다.</p>
-      <div className="wm-join">
-        <input className="wm-input" value={code} onChange={(e) => setCode(e.target.value)} onKeyDown={(e) => e.key === "Enter" && onEnter(code)} placeholder="참여 코드" maxLength={6} />
-        <button className="wm-btn wm-pri" disabled={!code.trim()} onClick={() => onEnter(code)}>입장</button>
+    <div>
+      <div className="wm-card wm-entry">
+        <h2>초대 코드 입력</h2>
+        <p>참여 코드(또는 링크)로 입장하거나, 아래 진행 중인 모임에서 골라 들어가세요.</p>
+        <div className="wm-join">
+          <input className="wm-input" value={code} onChange={(e) => setCode(e.target.value)} onKeyDown={(e) => e.key === "Enter" && onEnter(code)} placeholder="참여 코드" maxLength={6} />
+          <button className="wm-btn wm-pri" disabled={!code.trim()} onClick={() => onEnter(code)}>입장</button>
+        </div>
+        {!showHost ? (
+          <button className="wm-linktiny" onClick={() => setShowHost(true)}>주최자세요? 로그인</button>
+        ) : (
+          <div className="wm-join" style={{ marginTop: 12 }}>
+            <input className="wm-input" type="password" value={pin} onChange={(e) => setPin(e.target.value)} onKeyDown={(e) => e.key === "Enter" && onHostLogin(pin)} placeholder="주최자 비밀번호" style={{ textTransform: "none", letterSpacing: "normal" }} />
+            <button className="wm-btn wm-ghost" disabled={!pin.trim()} onClick={() => onHostLogin(pin)}>로그인</button>
+          </div>
+        )}
       </div>
-      {!showHost ? (
-        <button className="wm-linktiny" onClick={() => setShowHost(true)}>주최자세요? 로그인</button>
-      ) : (
-        <div className="wm-join" style={{ marginTop: 12 }}>
-          <input className="wm-input" type="password" value={pin} onChange={(e) => setPin(e.target.value)} onKeyDown={(e) => e.key === "Enter" && onHostLogin(pin)} placeholder="주최자 비밀번호" style={{ textTransform: "none", letterSpacing: "normal" }} />
-          <button className="wm-btn wm-ghost" disabled={!pin.trim()} onClick={() => onHostLogin(pin)}>로그인</button>
+      {active && active.length > 0 && (
+        <div style={{ marginTop: 18 }}>
+          <div className="wm-label" style={{ margin: "0 2px 9px" }}>현재 투표 중인 모임</div>
+          <div className="wm-list">
+            {active.map((m) => (
+              <div key={m.code} className="wm-card wm-mcard" onClick={() => onEnter(m.code)}>
+                <div className="wm-titlerow">
+                  {m.type && <span className="wm-type">{TYPE_ICON[m.type] || ""} {m.type}</span>}
+                  <h3 className="wm-mtitle">{m.title}</h3>
+                </div>
+                {m.deadline && <div className="wm-meta"><span className="wm-dl">⏳ {remainText(m.deadline)}</span></div>}
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </div>
   );
 }
 
-function Home({ meetings, onOpen, onNew }) {
+function Home({ meetings, isAdmin, onAddHost, onOpen, onNew }) {
+  const [hn, setHn] = useState("");
+  const [hp, setHp] = useState("");
   if (meetings === null) return <div className="wm-spin" />;
+  const AdminPanel = isAdmin ? (
+    <div className="wm-card" style={{ padding: 18, marginTop: 14 }}>
+      <div className="wm-label" style={{ marginBottom: 6 }}>다른 사람에게 일정 생성 권한 주기</div>
+      <p style={{ fontSize: 12.5, color: "var(--muted)", margin: "0 0 12px", lineHeight: 1.55 }}>이름과 비밀번호를 정해 알려주면, 그 사람은 자기 비밀번호로 로그인해 자신의 모임만 만들고 관리합니다.</p>
+      <div className="wm-slotrow">
+        <input className="wm-input" placeholder="이름" value={hn} onChange={(e) => setHn(e.target.value)} />
+        <input className="wm-input" placeholder="비밀번호" value={hp} onChange={(e) => setHp(e.target.value)} />
+        <button className="wm-btn wm-ghost wm-sm" disabled={!hn.trim() || !hp.trim()} onClick={() => { onAddHost(hn.trim(), hp.trim()); setHn(""); setHp(""); }}>권한 부여</button>
+      </div>
+    </div>
+  ) : null;
   if (meetings.length === 0)
-    return (<div className="wm-card wm-empty"><h3>아직 잡은 모임이 없어요</h3><p>모임을 만들면 참여 코드와 링크가 나와요. 그걸 받은 사람만 해당 모임에 입장할 수 있습니다.</p><button className="wm-btn wm-pri" onClick={onNew}>첫 모임 만들기</button></div>);
+    return (<div><div className="wm-card wm-empty"><h3>아직 잡은 모임이 없어요</h3><p>모임을 만들면 참여 코드와 링크가 나와요. 그걸 받은 사람만 해당 모임에 입장할 수 있습니다.</p><button className="wm-btn wm-pri" onClick={onNew}>첫 모임 만들기</button></div>{AdminPanel}</div>);
   return (
-    <div className="wm-list">
-      {meetings.map((m) => {
-        const span = m.slots.length ? `${fmtSlot(m.slots[0].start).split(" ")[0]} 외 ${m.slots.length}개 후보` : "후보 없음";
-        const st = statusOf(m); const rt = remainText(m.deadline);
-        return (
-          <div key={m.id} className="wm-card wm-mcard" onClick={() => onOpen(m.id)}>
-            <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start" }}>
-              <div className="wm-titlerow">
-                {m.type && <span className="wm-type">{TYPE_ICON[m.type] || ""} {m.type}</span>}
-                <h3 className="wm-mtitle">{m.title}</h3>
+    <div>
+      <div className="wm-list">
+        {meetings.map((m) => {
+          const span = m.slots.length ? `${fmtSlot(m.slots[0].start).split(" ")[0]} 외 ${m.slots.length}개 후보` : "후보 없음";
+          const st = statusOf(m); const rt = remainText(m.deadline);
+          return (
+            <div key={m.id} className="wm-card wm-mcard" onClick={() => onOpen(m.id)}>
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start" }}>
+                <div className="wm-titlerow">
+                  {m.type && <span className="wm-type">{TYPE_ICON[m.type] || ""} {m.type}</span>}
+                  <h3 className="wm-mtitle">{m.title}</h3>
+                </div>
+                <span className={"wm-badge " + st.k}>{st.t}</span>
               </div>
-              <span className={"wm-badge " + st.k}>{st.t}</span>
+              <div className="wm-meta">
+                <span>🗓 {span}</span>
+                {m.location && <span>📍 {m.location}</span>}
+                {rt && <span className={"wm-dl" + (st.k === "soon" ? " soon" : st.k === "closed" ? " over" : "")}>⏳ {rt}</span>}
+                {isAdmin && m.owner && <span>👤 {m.owner}</span>}
+              </div>
             </div>
-            <div className="wm-meta">
-              <span>🗓 {span}</span>
-              {m.location && <span>📍 {m.location}</span>}
-              {rt && <span className={"wm-dl" + (st.k === "soon" ? " soon" : st.k === "closed" ? " over" : "")}>⏳ {rt}</span>}
-            </div>
-          </div>
-        );
-      })}
+          );
+        })}
+      </div>
+      {AdminPanel}
     </div>
   );
 }
