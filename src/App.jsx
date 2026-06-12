@@ -14,26 +14,21 @@ async function cfgGet() {
 }
 async function cfgSet(v) { try { await window.storage.set("cfg:gasUrl", v, true); } catch {} }
 
-async function apiGet() {
-  const r = await fetch(GAS_URL, { method: "GET" });
-  return await r.json();
-}
 async function apiPost(payload) {
   // Content-Type 미지정 → text/plain(단순요청)으로 보내 CORS preflight 회피
   await fetch(GAS_URL, { method: "POST", body: JSON.stringify(payload) });
 }
-const apiSaveMeeting = (m) => apiPost({ action: "saveMeeting", meeting: m });
-const apiDeleteMeeting = (id) => apiPost({ action: "deleteMeeting", id });
+async function apiPostJson(payload) {
+  const r = await fetch(GAS_URL, { method: "POST", body: JSON.stringify(payload) });
+  return await r.json();
+}
+const apiHostData = (pin) => apiPostJson({ action: "hostData", pin });
+const apiGetByCode = (code) => apiPostJson({ action: "getByCode", code });
+const apiSaveMeeting = (m, pin) => apiPost({ action: "saveMeeting", meeting: m, pin });
+const apiDeleteMeeting = (id, pin) => apiPost({ action: "deleteMeeting", id, pin });
+const apiSetFinal = (id, finalSlotId, pin) => apiPost({ action: "setFinal", id, finalSlotId, pin });
+const apiAddToCalendar = (mtgId, pin) => apiPostJson({ action: "addToCalendar", mtgId, pin });
 const apiSaveResponse = (mtgId, name, avail, note) => apiPost({ action: "saveResponse", mtgId, name, avail, note });
-const apiSetFinal = (id, finalSlotId) => apiPost({ action: "setFinal", id, finalSlotId });
-async function apiParseImage(image, mediaType, today) {
-  const r = await fetch(GAS_URL, { method: "POST", body: JSON.stringify({ action: "parseImage", image, mediaType, today }) });
-  return await r.json();
-}
-async function apiAddToCalendar(mtgId) {
-  const r = await fetch(GAS_URL, { method: "POST", body: JSON.stringify({ action: "addToCalendar", mtgId }) });
-  return await r.json();
-}
 const apiAddSlot = (mtgId, slot) => apiPost({ action: "addSlot", mtgId, slot });
 
 /* ───────────────────────── 공통 헬퍼 ───────────────────────── */
@@ -44,6 +39,12 @@ const uid = (p = "") => p + Math.random().toString(36).slice(2, 8) + Date.now().
 const genCode = () => Array.from({ length: 6 }, () => CODE_ABC[Math.floor(Math.random() * CODE_ABC.length)]).join("");
 const asArr = (v) => (Array.isArray(v) ? v : (() => { try { return JSON.parse(v) || []; } catch { return []; } })());
 const asObj = (v) => (v && typeof v === "object" ? v : (() => { try { return JSON.parse(v) || {}; } catch { return {}; } })());
+const lsGet = (k) => { try { return localStorage.getItem(k); } catch { return null; } };
+const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch {} };
+const lsDel = (k) => { try { localStorage.removeItem(k); } catch {} };
+const normM = (m) => ({ ...m, slots: asArr(m.slots), createdAt: Number(m.createdAt) || 0, expected: m.expected ? Number(m.expected) : null });
+const normResp = (r) => ({ ...r, avail: asObj(r.avail) });
+const normList = (d) => ({ meetings: (d.meetings || []).map(normM).sort((a, b) => b.createdAt - a.createdAt), responses: (d.responses || []).map(normResp) });
 
 const WD = ["일", "월", "화", "수", "목", "금", "토"];
 const pad = (n) => String(n).padStart(2, "0");
@@ -317,6 +318,12 @@ textarea.wm-input { resize:vertical; min-height:64px; }
 .wm-setup h2 { font-size:18px; margin:0 0 6px; letter-spacing:-.02em; }
 .wm-setup p { font-size:13px; color:var(--muted); margin:0 0 18px; line-height:1.6; }
 .wm-steps { font-size:12.5px; color:var(--muted); line-height:1.7; background:#F4F6F9; border:1px solid var(--line); border-radius:10px; padding:13px 15px; margin-top:14px; }
+.wm-entry { padding:30px 26px; margin-top:8px; }
+.wm-entry h2 { font-size:19px; margin:0 0 6px; letter-spacing:-.02em; }
+.wm-entry p { font-size:13px; color:var(--muted); margin:0 0 18px; line-height:1.6; }
+.wm-linktiny { background:none; border:none; color:var(--brand-dk); font-family:inherit; font-size:13px; cursor:pointer; padding:10px 0 0; text-decoration:underline; }
+.wm-logout { background:none; border:1px solid var(--line); color:var(--muted); border-radius:9px; font-family:inherit; font-size:12.5px; padding:7px 11px; cursor:pointer; }
+.wm-logout:hover { color:var(--ink); }
 .wm-drop { display:flex; align-items:center; justify-content:center; gap:8px; text-align:center; cursor:pointer; border:1.5px dashed var(--line); border-radius:12px; padding:16px; font-size:13px; color:var(--muted); background:#F8FAFB; transition:.15s; line-height:1.5; }
 .wm-drop:hover { border-color:var(--brand); color:var(--brand-dk); background:rgba(var(--brand-rgb),.05); }
 @media (max-width:560px){ .wm-slotrow { flex-wrap:wrap; } .wm-slotrow .wm-input { flex:1 1 40%; } }
@@ -325,15 +332,17 @@ textarea.wm-input { resize:vertical; min-height:64px; }
 
 /* ───────────────────────── App ───────────────────────── */
 export default function App() {
-  const [gasUrl, setGasUrl] = useState(undefined); // undefined=확인중, ""=설정필요, url=연결됨
-  const [data, setData] = useState(null); // {meetings, responses, error?}
+  const [gasUrl, setGasUrl] = useState(undefined);
+  const [data, setData] = useState(null);
   const [view, setView] = useState("home");
   const [curId, setCurId] = useState(null);
   const [mode, setMode] = useState("host");
+  const [host, setHost] = useState(false);
+  const [hostPin, setHostPin] = useState("");
+  const [guestCode, setGuestCode] = useState(null);
   const [toast, setToast] = useState("");
   const [confirm, setConfirm] = useState(null);
   const [showSetup, setShowSetup] = useState(false);
-  const [linkCode, setLinkCode] = useState(typeof window !== "undefined" ? readHashCode() : "");
   const toastTimer = useRef(null);
 
   const flash = (m) => { setToast(m); clearTimeout(toastTimer.current); toastTimer.current = setTimeout(() => setToast(""), 2200); };
@@ -341,63 +350,110 @@ export default function App() {
   const loadData = useCallback(async () => {
     if (!GAS_URL) return;
     try {
-      const d = await apiGet();
-      const meetings = (d.meetings || []).map((m) => ({ ...m, slots: asArr(m.slots), createdAt: Number(m.createdAt) || 0, expected: m.expected ? Number(m.expected) : null }))
-        .sort((a, b) => b.createdAt - a.createdAt);
-      const responses = (d.responses || []).map((r) => ({ ...r, avail: asObj(r.avail) }));
-      setData({ meetings, responses });
-    } catch {
-      setData({ meetings: [], responses: [], error: true });
+      if (host && hostPin) {
+        const d = await apiHostData(hostPin);
+        if (d.ok) setData(normList(d));
+        else { setHost(false); setHostPin(""); lsDel("umoga:pin"); }
+      } else if (guestCode) {
+        const d = await apiGetByCode(guestCode);
+        if (d.ok) setData({ meetings: [normM(d.meeting)], responses: (d.responses || []).map(normResp) });
+      }
+    } catch {}
+  }, [host, hostPin, guestCode]);
+
+  const openByCode = async (code) => {
+    const c = (code || "").trim().toUpperCase();
+    if (!c) return false;
+    const d = await apiGetByCode(c);
+    if (d && d.ok) {
+      setGuestCode(c); setMode("guest");
+      setData({ meetings: [normM(d.meeting)], responses: (d.responses || []).map(normResp) });
+      setCurId(d.meeting.id); setView("detail");
+      return true;
     }
-  }, []);
+    flash("그 코드의 모임을 찾지 못했어요");
+    return false;
+  };
+
+  const hostLogin = async (pin) => {
+    const pn = (pin || "").trim();
+    if (!pn) return;
+    const d = await apiHostData(pn);
+    if (d && d.ok) {
+      setHost(true); setHostPin(pn); lsSet("umoga:pin", pn);
+      setGuestCode(null); setCurId(null); setView("home"); setData(normList(d));
+    } else flash("비밀번호가 올바르지 않아요");
+  };
+  const hostLogout = () => {
+    setHost(false); setHostPin(""); lsDel("umoga:pin");
+    setGuestCode(null); setCurId(null); setView("home"); setData({ meetings: [], responses: [] });
+  };
 
   useEffect(() => {
     (async () => {
-      if (GAS_URL_DEFAULT) { GAS_URL = GAS_URL_DEFAULT; setGasUrl(GAS_URL_DEFAULT); await loadData(); return; }
-      const c = hasWS ? await cfgGet() : "";
-      if (c) { GAS_URL = c; setGasUrl(c); await loadData(); }
-      else setGasUrl("");
+      if (GAS_URL_DEFAULT) { GAS_URL = GAS_URL_DEFAULT; setGasUrl(GAS_URL_DEFAULT); }
+      else {
+        const c = hasWS ? await cfgGet() : "";
+        if (c) { GAS_URL = c; setGasUrl(c); } else { setGasUrl(""); return; }
+      }
+      const hashCode = readHashCode();
+      if (hashCode) { await openByCode(hashCode); return; }
+      const savedPin = lsGet("umoga:pin");
+      if (savedPin) {
+        const d = await apiHostData(savedPin);
+        if (d && d.ok) { setHost(true); setHostPin(savedPin); setData(normList(d)); return; }
+        lsDel("umoga:pin");
+      }
+      setData({ meetings: [], responses: [] });
     })();
-  }, [loadData]);
-
-  useEffect(() => {
-    const onHash = () => { const c = readHashCode(); if (c) setLinkCode(c); };
-    window.addEventListener("hashchange", onHash);
-    return () => window.removeEventListener("hashchange", onHash);
+    // eslint-disable-next-line
   }, []);
 
   useEffect(() => {
-    if (!linkCode || !data) return;
-    const m = data.meetings.find((x) => (x.code || "").toUpperCase() === linkCode);
-    if (m) { setMode("guest"); setCurId(m.id); setView("detail"); }
-    else flash("링크의 모임을 찾지 못했어요");
-    setLinkCode("");
-  }, [linkCode, data]);
+    const onHash = () => { const c = readHashCode(); if (c) openByCode(c); };
+    window.addEventListener("hashchange", onHash);
+    return () => window.removeEventListener("hashchange", onHash);
+    // eslint-disable-next-line
+  }, []);
 
   const saveUrl = async (url) => {
     GAS_URL = url.trim();
     if (hasWS) await cfgSet(GAS_URL);
-    setGasUrl(GAS_URL);
-    setShowSetup(false);
-    setData(null);
-    await loadData();
+    setGasUrl(GAS_URL); setShowSetup(false);
     flash("연결됐어요");
   };
 
   const goHome = async () => {
-    setCurId(null); setView("home"); setLinkCode("");
-    if (typeof window !== "undefined" && window.location.hash) {
-      window.history.replaceState(null, "", window.location.pathname + window.location.search);
-    }
-    await loadData();
+    setCurId(null); setView("home");
+    if (typeof window !== "undefined" && window.location.hash) window.history.replaceState(null, "", window.location.pathname + window.location.search);
+    if (host) { await loadData(); }
+    else { setGuestCode(null); setData({ meetings: [], responses: [] }); }
   };
 
   if (gasUrl === undefined) return (<div className="wm"><style>{CSS}</style><div className="wm-spin" /></div>);
   if (gasUrl === "" || showSetup)
     return (<div className="wm"><style>{CSS}</style><div className="wm-wrap"><Setup onSave={saveUrl} current={gasUrl} onClose={gasUrl ? () => setShowSetup(false) : null} /></div></div>);
 
-  const meetings = data ? data.meetings : null;
-  const responses = data ? data.responses : [];
+  const curMeeting = data && curId ? data.meetings.find((m) => m.id === curId) : null;
+
+  let body;
+  if (data === null) body = <div className="wm-spin" />;
+  else if (view === "detail" && curMeeting)
+    body = (
+      <Detail mtg={curMeeting} responses={data.responses.filter((r) => r.mtgId === curId)}
+        mode={mode} hostPin={hostPin} flash={flash} askConfirm={setConfirm}
+        onBack={goHome} onRefresh={loadData}
+        onDeleted={async () => { setCurId(null); setView("home"); await loadData(); }} />
+    );
+  else if (host && view === "create")
+    body = (
+      <Create onCancel={goHome} flash={flash}
+        onSaved={async (m) => { await apiSaveMeeting(m, hostPin); await loadData(); setCurId(m.id); setMode("host"); setView("detail"); flash("모임을 만들었어요"); }} />
+    );
+  else if (host)
+    body = <Home meetings={data.meetings} onOpen={(id) => { setMode("host"); setCurId(id); setView("detail"); }} onNew={() => setView("create")} />;
+  else
+    body = <CodeEntry onEnter={openByCode} onHostLogin={hostLogin} />;
 
   return (
     <div className="wm">
@@ -409,31 +465,12 @@ export default function App() {
             <span className="wm-sub">우리가 모두 가능한 시간</span>
           </div>
           <div className="wm-headbtns">
-            {view === "home" && <button className="wm-btn wm-pri" onClick={() => setView("create")}>+ 새 모임</button>}
-            <button className="wm-gear" title="연결 설정" onClick={() => setShowSetup(true)}>⚙</button>
+            {host && view === "home" && <button className="wm-btn wm-pri" onClick={() => setView("create")}>+ 새 모임</button>}
+            {(host || !GAS_URL) && <button className="wm-gear" title="연결 설정" onClick={() => setShowSetup(true)}>⚙</button>}
+            {host && <button className="wm-logout" onClick={hostLogout}>로그아웃</button>}
           </div>
         </div>
-
-        {data && data.error && <div className="wm-err">시트에 연결하지 못했어요. ⚙ 연결 설정의 URL과 배포 권한(모든 사용자)을 확인해 주세요.</div>}
-
-        {view === "home" && (
-          <Home meetings={meetings} flash={flash}
-            onOpen={(id) => { setMode("host"); setCurId(id); setView("detail"); }}
-            onJoin={(id) => { setMode("guest"); setCurId(id); setView("detail"); }}
-            onNew={() => setView("create")} />
-        )}
-        {view === "create" && (
-          <Create onCancel={goHome} flash={flash}
-            onSaved={async (m) => { await apiSaveMeeting(m); await loadData(); setCurId(m.id); setMode("host"); setView("detail"); flash("모임을 만들었어요"); }} />
-        )}
-        {view === "detail" && curId && meetings && (
-          <Detail
-            mtg={meetings.find((m) => m.id === curId)}
-            responses={responses.filter((r) => r.mtgId === curId)}
-            mode={mode} flash={flash} askConfirm={setConfirm}
-            onBack={goHome} onRefresh={loadData}
-            onDeleted={async () => { setCurId(null); setView("home"); await loadData(); }} />
-        )}
+        {body}
       </div>
 
       {toast && <div className="wm-toast">{toast}</div>}
@@ -451,6 +488,7 @@ export default function App() {
     </div>
   );
 }
+
 
 /* ───────────────────────── Setup ───────────────────────── */
 function Setup({ onSave, current, onClose }) {
@@ -475,51 +513,56 @@ function Setup({ onSave, current, onClose }) {
 }
 
 /* ───────────────────────── Home ───────────────────────── */
-function Home({ meetings, flash, onOpen, onJoin, onNew }) {
+function CodeEntry({ onEnter, onHostLogin }) {
   const [code, setCode] = useState("");
-  if (meetings === null) return <div className="wm-spin" />;
-
-  const join = () => {
-    const c = code.trim().toUpperCase();
-    if (!c) return;
-    const m = meetings.find((x) => (x.code || "").toUpperCase() === c);
-    if (m) onJoin(m.id); else flash("그 코드의 모임을 찾지 못했어요");
-  };
-  const JoinBox = (
-    <div className="wm-join">
-      <input className="wm-input" value={code} onChange={(e) => setCode(e.target.value)} onKeyDown={(e) => e.key === "Enter" && join()} placeholder="참여 코드 입력" maxLength={6} />
-      <button className="wm-btn wm-ghost" onClick={join}>참여</button>
+  const [showHost, setShowHost] = useState(false);
+  const [pin, setPin] = useState("");
+  return (
+    <div className="wm-card wm-entry">
+      <h2>초대 코드 입력</h2>
+      <p>주최자에게 받은 참여 코드(또는 링크)로만 입장할 수 있어요. 다른 모임은 보이지 않습니다.</p>
+      <div className="wm-join">
+        <input className="wm-input" value={code} onChange={(e) => setCode(e.target.value)} onKeyDown={(e) => e.key === "Enter" && onEnter(code)} placeholder="참여 코드" maxLength={6} />
+        <button className="wm-btn wm-pri" disabled={!code.trim()} onClick={() => onEnter(code)}>입장</button>
+      </div>
+      {!showHost ? (
+        <button className="wm-linktiny" onClick={() => setShowHost(true)}>주최자세요? 로그인</button>
+      ) : (
+        <div className="wm-join" style={{ marginTop: 12 }}>
+          <input className="wm-input" type="password" value={pin} onChange={(e) => setPin(e.target.value)} onKeyDown={(e) => e.key === "Enter" && onHostLogin(pin)} placeholder="주최자 비밀번호" style={{ textTransform: "none", letterSpacing: "normal" }} />
+          <button className="wm-btn wm-ghost" disabled={!pin.trim()} onClick={() => onHostLogin(pin)}>로그인</button>
+        </div>
+      )}
     </div>
   );
+}
 
+function Home({ meetings, onOpen, onNew }) {
+  if (meetings === null) return <div className="wm-spin" />;
   if (meetings.length === 0)
-    return (<div>{JoinBox}<div className="wm-card wm-empty"><h3>아직 잡은 모임이 없어요</h3><p>모임을 만들면 참여 코드가 나와요. 코드를 공유하면 참석자가 바로 들어와 가능 시간을 체크합니다.</p><button className="wm-btn wm-pri" onClick={onNew}>첫 모임 만들기</button></div></div>);
-
+    return (<div className="wm-card wm-empty"><h3>아직 잡은 모임이 없어요</h3><p>모임을 만들면 참여 코드와 링크가 나와요. 그걸 받은 사람만 해당 모임에 입장할 수 있습니다.</p><button className="wm-btn wm-pri" onClick={onNew}>첫 모임 만들기</button></div>);
   return (
-    <div>
-      {JoinBox}
-      <div className="wm-list">
-        {meetings.map((m) => {
-          const span = m.slots.length ? `${fmtSlot(m.slots[0].start).split(" ")[0]} 외 ${m.slots.length}개 후보` : "후보 없음";
-          const st = statusOf(m); const rt = remainText(m.deadline);
-          return (
-            <div key={m.id} className="wm-card wm-mcard" onClick={() => onOpen(m.id)}>
-              <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start" }}>
-                <div className="wm-titlerow">
-                  {m.type && <span className="wm-type">{TYPE_ICON[m.type] || ""} {m.type}</span>}
-                  <h3 className="wm-mtitle">{m.title}</h3>
-                </div>
-                <span className={"wm-badge " + st.k}>{st.t}</span>
+    <div className="wm-list">
+      {meetings.map((m) => {
+        const span = m.slots.length ? `${fmtSlot(m.slots[0].start).split(" ")[0]} 외 ${m.slots.length}개 후보` : "후보 없음";
+        const st = statusOf(m); const rt = remainText(m.deadline);
+        return (
+          <div key={m.id} className="wm-card wm-mcard" onClick={() => onOpen(m.id)}>
+            <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start" }}>
+              <div className="wm-titlerow">
+                {m.type && <span className="wm-type">{TYPE_ICON[m.type] || ""} {m.type}</span>}
+                <h3 className="wm-mtitle">{m.title}</h3>
               </div>
-              <div className="wm-meta">
-                <span>🗓 {span}</span>
-                {m.location && <span>📍 {m.location}</span>}
-                {rt && <span className={"wm-dl" + (st.k === "soon" ? " soon" : st.k === "closed" ? " over" : "")}>⏳ {rt}</span>}
-              </div>
+              <span className={"wm-badge " + st.k}>{st.t}</span>
             </div>
-          );
-        })}
-      </div>
+            <div className="wm-meta">
+              <span>🗓 {span}</span>
+              {m.location && <span>📍 {m.location}</span>}
+              {rt && <span className={"wm-dl" + (st.k === "soon" ? " soon" : st.k === "closed" ? " over" : "")}>⏳ {rt}</span>}
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -639,7 +682,7 @@ function Create({ onCancel, onSaved, flash }) {
 }
 
 /* ───────────────────────── Detail ───────────────────────── */
-function Detail({ mtg, responses, mode, flash, askConfirm, onBack, onRefresh, onDeleted }) {
+function Detail({ mtg, responses, mode, hostPin, flash, askConfirm, onBack, onRefresh, onDeleted }) {
   const [name, setName] = useState("");
   const [avail, setAvail] = useState({});
   const [note, setNote] = useState("");
@@ -688,12 +731,12 @@ function Detail({ mtg, responses, mode, flash, askConfirm, onBack, onRefresh, on
   };
   const setFinal = async (sid) => {
     const next = mtg.finalSlotId === sid ? "" : sid;
-    await apiSetFinal(mtg.id, next); await onRefresh();
+    await apiSetFinal(mtg.id, next, hostPin); await onRefresh();
     flash(next ? "이 시간으로 확정했어요" : "확정을 취소했어요");
   };
   const delMeeting = () => askConfirm({
     title: "모임을 삭제할까요?", msg: "후보 일정과 참석자 응답이 시트에서 모두 사라집니다.",
-    onYes: async () => { await apiDeleteMeeting(mtg.id); await onDeleted(); },
+    onYes: async () => { await apiDeleteMeeting(mtg.id, hostPin); await onDeleted(); },
   });
   const addMySlot = async () => {
     if (!newDate || !newTime) return;
@@ -708,7 +751,7 @@ function Detail({ mtg, responses, mode, flash, askConfirm, onBack, onRefresh, on
   };
   const saveToCal = async () => {
     setSavingCal(true);
-    const res = await apiAddToCalendar(mtg.id);
+    const res = await apiAddToCalendar(mtg.id, hostPin);
     setSavingCal(false);
     if (res && res.ok) flash("내 구글 캘린더에 저장했어요");
     else flash((res && res.error) || "캘린더 저장 실패");
