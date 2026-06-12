@@ -86,6 +86,14 @@ function remainText(deadline) {
   if (h > 0) return `마감까지 ${h}시간 ${mn}분`;
   return `마감까지 ${mn}분`;
 }
+function readHashCode() {
+  const h = typeof window !== "undefined" ? (window.location.hash || "") : "";
+  const m = h.match(/#\/m\/([A-Za-z0-9]+)/);
+  return m ? m[1].toUpperCase() : "";
+}
+function meetingUrl(code) {
+  return window.location.origin + window.location.pathname + "#/m/" + code;
+}
 
 /* ───────────────────────── styles ───────────────────────── */
 const CSS = `
@@ -206,6 +214,8 @@ textarea.wm-input { resize:vertical; min-height:64px; }
 .wm-share .codetag { font-size:11px; font-weight:700; color:var(--muted); letter-spacing:.02em; }
 .wm-code { font-size:24px; font-weight:800; letter-spacing:.14em; color:var(--brand-dk); margin:2px 0 10px; font-family:'SFMono-Regular',ui-monospace,Menlo,monospace; }
 .wm-invite { width:100%; border:1px solid var(--line); border-radius:9px; padding:9px 11px; font-size:12.5px; font-family:inherit; color:var(--muted); background:#fff; resize:none; line-height:1.5; }
+.wm-linkrow { display:flex; gap:8px; align-items:center; }
+.wm-linkrow .wm-input { flex:1; font-size:12.5px; padding:9px 11px; }
 .wm-dl { font-size:12.5px; font-weight:650; }
 .wm-dl.soon { color:var(--amber); }
 .wm-dl.over { color:var(--bad); }
@@ -246,6 +256,7 @@ export default function App() {
   const [toast, setToast] = useState("");
   const [confirm, setConfirm] = useState(null);
   const [showSetup, setShowSetup] = useState(false);
+  const [linkCode, setLinkCode] = useState(typeof window !== "undefined" ? readHashCode() : "");
   const toastTimer = useRef(null);
 
   const flash = (m) => { setToast(m); clearTimeout(toastTimer.current); toastTimer.current = setTimeout(() => setToast(""), 2200); };
@@ -272,6 +283,20 @@ export default function App() {
     })();
   }, [loadData]);
 
+  useEffect(() => {
+    const onHash = () => { const c = readHashCode(); if (c) setLinkCode(c); };
+    window.addEventListener("hashchange", onHash);
+    return () => window.removeEventListener("hashchange", onHash);
+  }, []);
+
+  useEffect(() => {
+    if (!linkCode || !data) return;
+    const m = data.meetings.find((x) => (x.code || "").toUpperCase() === linkCode);
+    if (m) { setMode("guest"); setCurId(m.id); setView("detail"); }
+    else flash("링크의 모임을 찾지 못했어요");
+    setLinkCode("");
+  }, [linkCode, data]);
+
   const saveUrl = async (url) => {
     GAS_URL = url.trim();
     if (hasWS) await cfgSet(GAS_URL);
@@ -282,7 +307,13 @@ export default function App() {
     flash("연결됐어요");
   };
 
-  const goHome = async () => { setCurId(null); setView("home"); await loadData(); };
+  const goHome = async () => {
+    setCurId(null); setView("home"); setLinkCode("");
+    if (typeof window !== "undefined" && window.location.hash) {
+      window.history.replaceState(null, "", window.location.pathname + window.location.search);
+    }
+    await loadData();
+  };
 
   if (gasUrl === undefined) return (<div className="wm"><style>{CSS}</style><div className="wm-spin" /></div>);
   if (gasUrl === "" || showSetup)
@@ -561,8 +592,10 @@ function Detail({ mtg, responses, mode, flash, askConfirm, onBack, onRefresh, on
   const ranked = [...tally].sort((a, b) => b.count - a.count || new Date(a.slot.start) - new Date(b.slot.start));
   const finalSlot = mtg.slots.find((s) => s.id === mtg.finalSlotId);
 
-  const inviteText = `[${mtg.title}] ${mtg.type ? "(" + mtg.type + ") " : ""}가능한 시간을 알려주세요.\n'우모가'에서 참여 코드 ${mtg.code} 입력 → 가능 시간 체크` + (mtg.deadline ? `\n응답 마감: ${fmtSlot(mtg.deadline)}` : "");
+  const link = meetingUrl(mtg.code);
+  const inviteText = `[${mtg.title}] ${mtg.type ? "(" + mtg.type + ") " : ""}가능한 시간을 알려주세요.\n${link}` + (mtg.deadline ? `\n응답 마감: ${fmtSlot(mtg.deadline)}` : "");
   const copyInvite = async () => { try { await navigator.clipboard.writeText(inviteText); flash("초대 문구를 복사했어요"); } catch { flash("아래 문구를 길게 눌러 복사하세요"); } };
+  const copyLink = async () => { try { await navigator.clipboard.writeText(link); flash("링크를 복사했어요"); } catch { flash("링크를 길게 눌러 복사하세요"); } };
 
   const toggle = (sid) => setAvail((a) => ({ ...a, [sid]: !a[sid] }));
   const loadMine = (n) => { const mine = responses.find((r) => r.name.trim().toLowerCase() === n.trim().toLowerCase()); if (mine) { setAvail(mine.avail || {}); setNote(mine.note || ""); } };
@@ -605,9 +638,13 @@ function Detail({ mtg, responses, mode, flash, askConfirm, onBack, onRefresh, on
 
       {isHost && (
         <div className="wm-share">
-          <div className="codetag">참여 코드 — 참석자에게 공유하세요</div>
-          <div className="wm-code">{mtg.code}</div>
-          <textarea className="wm-invite" rows={3} readOnly value={inviteText} onFocus={(e) => e.target.select()} />
+          <div className="codetag">이 모임 링크 — 참석자에게 공유하세요</div>
+          <div className="wm-linkrow" style={{ margin: "6px 0 4px" }}>
+            <input className="wm-input" readOnly value={link} onFocus={(e) => e.target.select()} />
+            <button className="wm-btn wm-pri wm-sm" onClick={copyLink}>링크 복사</button>
+          </div>
+          <div className="codetag" style={{ marginTop: 8 }}>또는 참여 코드 <b style={{ color: "var(--brand-dk)", letterSpacing: ".1em" }}>{mtg.code}</b></div>
+          <textarea className="wm-invite" rows={3} readOnly value={inviteText} onFocus={(e) => e.target.select()} style={{ marginTop: 10 }} />
           <button className="wm-btn wm-ghost wm-sm" style={{ marginTop: 10 }} onClick={copyInvite}>초대 문구 복사</button>
         </div>
       )}
