@@ -328,6 +328,15 @@ textarea.wm-input { resize:vertical; min-height:64px; }
 .wm-linktiny { background:none; border:none; color:var(--brand-dk); font-family:inherit; font-size:13px; cursor:pointer; padding:10px 0 0; text-decoration:underline; }
 .wm-logout { background:none; border:1px solid var(--line); color:var(--muted); border-radius:9px; font-family:inherit; font-size:12.5px; padding:7px 11px; cursor:pointer; }
 .wm-logout:hover { color:var(--ink); }
+.wm-menuwrap { position:relative; }
+.wm-adminbtn { background:none; border:1px solid var(--line); color:var(--muted); border-radius:9px; font-family:inherit; font-size:12.5px; font-weight:600; padding:7px 12px; cursor:pointer; }
+.wm-adminbtn:hover { color:var(--ink); border-color:#C9D3DC; }
+.wm-pop { position:absolute; right:0; top:calc(100% + 8px); background:#fff; border:1px solid var(--line); border-radius:12px; box-shadow:0 10px 30px rgba(23,32,41,.16); padding:12px; min-width:236px; z-index:40; display:flex; flex-direction:column; gap:9px; }
+.wm-pop .wm-input { text-transform:none; letter-spacing:normal; }
+.wm-popitem { background:none; border:none; text-align:left; font-family:inherit; font-size:13.5px; color:var(--ink); padding:10px 11px; border-radius:9px; cursor:pointer; }
+.wm-popitem:hover { background:#F1F4F7; }
+.wm-backdrop { position:fixed; inset:0; z-index:39; }
+.wm-footer { text-align:center; font-size:12px; color:var(--faint); margin-top:36px; }
 .wm-drop { display:flex; align-items:center; justify-content:center; gap:8px; text-align:center; cursor:pointer; border:1.5px dashed var(--line); border-radius:12px; padding:16px; font-size:13px; color:var(--muted); background:#F8FAFB; transition:.15s; line-height:1.5; }
 .wm-drop:hover { border-color:var(--brand); color:var(--brand-dk); background:rgba(var(--brand-rgb),.05); }
 @media (max-width:560px){ .wm-slotrow { flex-wrap:wrap; } .wm-slotrow .wm-input { flex:1 1 40%; } }
@@ -345,6 +354,9 @@ export default function App() {
   const [hostPin, setHostPin] = useState("");
   const [guestCode, setGuestCode] = useState(null);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [loginOpen, setLoginOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [adminPin, setAdminPin] = useState("");
   const [toast, setToast] = useState("");
   const [confirm, setConfirm] = useState(null);
   const [showSetup, setShowSetup] = useState(false);
@@ -384,14 +396,17 @@ export default function App() {
 
   const hostLogin = async (pin) => {
     const pn = (pin || "").trim();
-    if (!pn) return;
+    if (!pn) return false;
     try {
       const d = await apiHostData(pn);
       if (d && d.ok) {
         setHost(true); setHostPin(pn); lsSet("umoga:pin", pn); setIsAdmin(!!d.admin);
         setGuestCode(null); setCurId(null); setView("home"); setData(normList(d));
-      } else flash("비밀번호가 올바르지 않아요");
+        return true;
+      }
+      flash("비밀번호가 올바르지 않아요");
     } catch { flash("서버 연결을 확인해 주세요"); }
+    return false;
   };
   const hostLogout = () => {
     setHost(false); setHostPin(""); setIsAdmin(false); lsDel("umoga:pin");
@@ -469,11 +484,12 @@ export default function App() {
       onAddHost={async (name, pin) => { await apiAddHost(name, pin, hostPin); flash(name + " 님에게 권한을 줬어요"); }}
       onOpen={(id) => { setMode("host"); setCurId(id); setView("detail"); }} onNew={() => setView("create")} />;
   else
-    body = <CodeEntry onEnter={openByCode} onHostLogin={hostLogin} />;
+    body = <CodeEntry onEnter={openByCode} />;
 
   return (
     <div className="wm">
       <style>{CSS}</style>
+      {(loginOpen || menuOpen) && <div className="wm-backdrop" onClick={() => { setLoginOpen(false); setMenuOpen(false); }} />}
       <div className="wm-wrap">
         <div className="wm-top">
           <div className="wm-brand" onClick={goHome}>
@@ -482,11 +498,34 @@ export default function App() {
           </div>
           <div className="wm-headbtns">
             {host && view === "home" && <button className="wm-btn wm-pri" onClick={() => setView("create")}>+ 새 모임</button>}
-            {(host || !GAS_URL) && <button className="wm-gear" title="연결 설정" onClick={() => setShowSetup(true)}>⚙</button>}
-            {host && <button className="wm-logout" onClick={hostLogout}>로그아웃</button>}
+            {!host && (
+              <div className="wm-menuwrap">
+                <button className="wm-adminbtn" onClick={() => { setLoginOpen((v) => !v); setMenuOpen(false); }}>관리자 로그인</button>
+                {loginOpen && (
+                  <div className="wm-pop">
+                    <input type="password" className="wm-input" placeholder="비밀번호" value={adminPin} autoFocus
+                      onChange={(e) => setAdminPin(e.target.value)}
+                      onKeyDown={async (e) => { if (e.key === "Enter") { const ok = await hostLogin(adminPin); if (ok) { setAdminPin(""); setLoginOpen(false); } } }} />
+                    <button className="wm-btn wm-pri wm-sm" disabled={!adminPin.trim()} onClick={async () => { const ok = await hostLogin(adminPin); if (ok) { setAdminPin(""); setLoginOpen(false); } }}>로그인</button>
+                  </div>
+                )}
+              </div>
+            )}
+            {host && (
+              <div className="wm-menuwrap">
+                <button className="wm-gear" title="메뉴" onClick={() => setMenuOpen((v) => !v)}>⚙</button>
+                {menuOpen && (
+                  <div className="wm-pop">
+                    <button className="wm-popitem" onClick={() => { setShowSetup(true); setMenuOpen(false); }}>스프레드시트 연결</button>
+                    <button className="wm-popitem" onClick={() => { setMenuOpen(false); hostLogout(); }}>로그아웃</button>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
         {body}
+        <div className="wm-footer">만든이 @carpediemkosuk</div>
       </div>
 
       {toast && <div className="wm-toast">{toast}</div>}
@@ -529,10 +568,8 @@ function Setup({ onSave, current, onClose }) {
 }
 
 /* ───────────────────────── Home ───────────────────────── */
-function CodeEntry({ onEnter, onHostLogin }) {
+function CodeEntry({ onEnter }) {
   const [code, setCode] = useState("");
-  const [showHost, setShowHost] = useState(false);
-  const [pin, setPin] = useState("");
   const [active, setActive] = useState(null);
   useEffect(() => {
     (async () => { try { const d = await apiPublicList(); setActive(d && d.ok ? d.meetings : []); } catch { setActive([]); } })();
@@ -541,26 +578,18 @@ function CodeEntry({ onEnter, onHostLogin }) {
     <div>
       <div className="wm-card wm-entry">
         <h2>초대 코드 입력</h2>
-        <p>참여 코드(또는 링크)로 입장하거나, 아래 진행 중인 모임에서 골라 들어가세요.</p>
+        <p>주최자에게 받은 참여 코드(또는 링크)로만 입장할 수 있어요.</p>
         <div className="wm-join">
           <input className="wm-input" value={code} onChange={(e) => setCode(e.target.value)} onKeyDown={(e) => e.key === "Enter" && onEnter(code)} placeholder="참여 코드" maxLength={6} />
           <button className="wm-btn wm-pri" disabled={!code.trim()} onClick={() => onEnter(code)}>입장</button>
         </div>
-        {!showHost ? (
-          <button className="wm-linktiny" onClick={() => setShowHost(true)}>주최자세요? 로그인</button>
-        ) : (
-          <div className="wm-join" style={{ marginTop: 12 }}>
-            <input className="wm-input" type="password" value={pin} onChange={(e) => setPin(e.target.value)} onKeyDown={(e) => e.key === "Enter" && onHostLogin(pin)} placeholder="주최자 비밀번호" style={{ textTransform: "none", letterSpacing: "normal" }} />
-            <button className="wm-btn wm-ghost" disabled={!pin.trim()} onClick={() => onHostLogin(pin)}>로그인</button>
-          </div>
-        )}
       </div>
       {active && active.length > 0 && (
         <div style={{ marginTop: 18 }}>
-          <div className="wm-label" style={{ margin: "0 2px 9px" }}>현재 투표 중인 모임</div>
+          <div className="wm-label" style={{ margin: "0 2px 9px" }}>현재 투표 중인 모임 · 입장하려면 코드가 필요해요</div>
           <div className="wm-list">
             {active.map((m) => (
-              <div key={m.code} className="wm-card wm-mcard" onClick={() => onEnter(m.code)}>
+              <div key={m.code} className="wm-card" style={{ padding: "16px 18px" }}>
                 <div className="wm-titlerow">
                   {m.type && <span className="wm-type">{TYPE_ICON[m.type] || ""} {m.type}</span>}
                   <h3 className="wm-mtitle">{m.title}</h3>
