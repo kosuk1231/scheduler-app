@@ -26,6 +26,10 @@ const apiSaveMeeting = (m) => apiPost({ action: "saveMeeting", meeting: m });
 const apiDeleteMeeting = (id) => apiPost({ action: "deleteMeeting", id });
 const apiSaveResponse = (mtgId, name, avail, note) => apiPost({ action: "saveResponse", mtgId, name, avail, note });
 const apiSetFinal = (id, finalSlotId) => apiPost({ action: "setFinal", id, finalSlotId });
+async function apiParseImage(image, mediaType, today) {
+  const r = await fetch(GAS_URL, { method: "POST", body: JSON.stringify({ action: "parseImage", image, mediaType, today }) });
+  return await r.json();
+}
 
 /* ───────────────────────── 공통 헬퍼 ───────────────────────── */
 const TYPES = ["워크숍", "회의", "강의", "온라인 중계"];
@@ -226,6 +230,8 @@ textarea.wm-input { resize:vertical; min-height:64px; }
 .wm-setup h2 { font-size:18px; margin:0 0 6px; letter-spacing:-.02em; }
 .wm-setup p { font-size:13px; color:var(--muted); margin:0 0 18px; line-height:1.6; }
 .wm-steps { font-size:12.5px; color:var(--muted); line-height:1.7; background:#F4F6F9; border:1px solid var(--line); border-radius:10px; padding:13px 15px; margin-top:14px; }
+.wm-drop { display:flex; align-items:center; justify-content:center; gap:8px; text-align:center; cursor:pointer; border:1.5px dashed var(--line); border-radius:12px; padding:16px; font-size:13px; color:var(--muted); background:#F8FAFB; transition:.15s; line-height:1.5; }
+.wm-drop:hover { border-color:var(--brand); color:var(--brand-dk); background:rgba(var(--brand-rgb),.05); }
 @media (max-width:560px){ .wm-slotrow { flex-wrap:wrap; } .wm-slotrow .wm-input { flex:1 1 40%; } }
 @media (prefers-reduced-motion:reduce){ .wm *{animation:none!important; transition:none!important;} }
 `;
@@ -291,8 +297,8 @@ export default function App() {
       <div className="wm-wrap">
         <div className="wm-top">
           <div className="wm-brand" onClick={goHome}>
-            <span className="wm-logo">언제<b>모여</b></span>
-            <span className="wm-sub">다 같이 되는 시간 찾기</span>
+            <span className="wm-logo">우모<b>가</b></span>
+            <span className="wm-sub">우리가 모두 가능한 시간</span>
           </div>
           <div className="wm-headbtns">
             {view === "home" && <button className="wm-btn wm-pri" onClick={() => setView("create")}>+ 새 모임</button>}
@@ -309,7 +315,7 @@ export default function App() {
             onNew={() => setView("create")} />
         )}
         {view === "create" && (
-          <Create onCancel={goHome}
+          <Create onCancel={goHome} flash={flash}
             onSaved={async (m) => { await apiSaveMeeting(m); await loadData(); setCurId(m.id); setMode("host"); setView("detail"); flash("모임을 만들었어요"); }} />
         )}
         {view === "detail" && curId && meetings && (
@@ -411,7 +417,7 @@ function Home({ meetings, flash, onOpen, onJoin, onNew }) {
 }
 
 /* ───────────────────────── Create ───────────────────────── */
-function Create({ onCancel, onSaved }) {
+function Create({ onCancel, onSaved, flash }) {
   const [title, setTitle] = useState("");
   const [type, setType] = useState("회의");
   const [location, setLocation] = useState("");
@@ -420,11 +426,34 @@ function Create({ onCancel, onSaved }) {
   const [dlTime, setDlTime] = useState("");
   const [slots, setSlots] = useState([{ id: uid("s"), date: "", time: "", durationMin: 60 }]);
   const [saving, setSaving] = useState(false);
+  const [parsing, setParsing] = useState(false);
+  const [parseErr, setParseErr] = useState("");
 
   const setSlot = (i, patch) => setSlots((s) => s.map((x, idx) => (idx === i ? { ...x, ...patch } : x)));
   const addSlot = () => setSlots((s) => [...s, { id: uid("s"), date: "", time: "", durationMin: 60 }]);
   const rmSlot = (i) => setSlots((s) => (s.length > 1 ? s.filter((_, idx) => idx !== i) : s));
   const valid = title.trim() && slots.some((s) => s.date && s.time);
+  const toBase64 = (file) => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result).split(",")[1]); r.onerror = rej; r.readAsDataURL(file); });
+  const onImage = async (file) => {
+    if (!file) return;
+    setParsing(true); setParseErr("");
+    try {
+      const b64 = await toBase64(file);
+      const res = await apiParseImage(b64, file.type || "image/png", new Date().toISOString().slice(0, 10));
+      const got = res && res.ok && Array.isArray(res.slots) ? res.slots : null;
+      if (got && got.length) {
+        setSlots(got.map((s) => ({ id: uid("s"), date: s.date || "", time: s.time || "", durationMin: Number(s.durationMin) || 60 })));
+        flash && flash(`${got.length}개 후보를 채웠어요. 확인 후 수정하세요`);
+      } else if (res && res.error === "NO_KEY") {
+        setParseErr("이미지 분석 키가 설정되지 않았어요 (Apps Script 속성 ANTHROPIC_API_KEY).");
+      } else {
+        setParseErr("일정을 찾지 못했어요. 직접 입력해 주세요.");
+      }
+    } catch {
+      setParseErr("이미지 분석에 실패했어요. 직접 입력해 주세요.");
+    }
+    setParsing(false);
+  };
 
   const save = async () => {
     setSaving(true);
@@ -475,6 +504,14 @@ function Create({ onCancel, onSaved }) {
           <label className="wm-label">안내 (선택)</label>
           <textarea className="wm-input" value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="참석자에게 보여줄 메모나 안건" />
         </div>
+        <div className="wm-field">
+          <label className="wm-label">스크린샷으로 후보 채우기 (선택)</label>
+          <label className="wm-drop">
+            <input type="file" accept="image/*" style={{ display: "none" }} disabled={parsing} onChange={(e) => onImage(e.target.files && e.target.files[0])} />
+            {parsing ? "이미지에서 일정을 읽는 중…" : "📷 카톡 등 일정 논의 캡처 올리기 — 후보 시간을 자동으로 채워줍니다"}
+          </label>
+          {parseErr && <div className="wm-lockmsg" style={{ marginTop: 8 }}>{parseErr}</div>}
+        </div>
         <div className="wm-field" style={{ marginBottom: 6 }}>
           <label className="wm-label">후보 일시 — 참석자가 이 중에서 가능한 시간을 고릅니다</label>
         </div>
@@ -524,7 +561,7 @@ function Detail({ mtg, responses, mode, flash, askConfirm, onBack, onRefresh, on
   const ranked = [...tally].sort((a, b) => b.count - a.count || new Date(a.slot.start) - new Date(b.slot.start));
   const finalSlot = mtg.slots.find((s) => s.id === mtg.finalSlotId);
 
-  const inviteText = `[${mtg.title}] ${mtg.type ? "(" + mtg.type + ") " : ""}가능한 시간을 알려주세요.\n'언제모여'에서 참여 코드 ${mtg.code} 입력 → 가능 시간 체크` + (mtg.deadline ? `\n응답 마감: ${fmtSlot(mtg.deadline)}` : "");
+  const inviteText = `[${mtg.title}] ${mtg.type ? "(" + mtg.type + ") " : ""}가능한 시간을 알려주세요.\n'우모가'에서 참여 코드 ${mtg.code} 입력 → 가능 시간 체크` + (mtg.deadline ? `\n응답 마감: ${fmtSlot(mtg.deadline)}` : "");
   const copyInvite = async () => { try { await navigator.clipboard.writeText(inviteText); flash("초대 문구를 복사했어요"); } catch { flash("아래 문구를 길게 눌러 복사하세요"); } };
 
   const toggle = (sid) => setAvail((a) => ({ ...a, [sid]: !a[sid] }));
