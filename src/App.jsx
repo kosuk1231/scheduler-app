@@ -99,6 +99,78 @@ function readHashCode() {
 function meetingUrl(code) {
   return window.location.origin + window.location.pathname + "#/m/" + code;
 }
+const WD_MAP = { "일": 0, "월": 1, "화": 2, "수": 3, "목": 4, "금": 5, "토": 6 };
+function parseScheduleText(text, todayDate) {
+  if (!text) return [];
+  const today = new Date(todayDate.getFullYear(), todayDate.getMonth(), todayDate.getDate());
+  const out = [];
+  const seen = new Set();
+  let lastDate = null;
+  const ymd = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  const fromMD = (mo, da) => {
+    let d = new Date(today.getFullYear(), mo - 1, da);
+    if (d < today) d = new Date(today.getFullYear() + 1, mo - 1, da);
+    return ymd(d);
+  };
+  const nextWeekday = (wd) => {
+    const d = new Date(today);
+    d.setDate(d.getDate() + ((wd - d.getDay() + 7) % 7));
+    return ymd(d);
+  };
+  function pushSlot(date, t, dur) {
+    const time = pad(t.h) + ":" + pad(t.m);
+    const key = date + " " + time;
+    if (seen.has(key)) return;
+    seen.add(key);
+    out.push({ date, time, durationMin: dur });
+  }
+  for (const raw of text.split(/\r?\n/)) {
+    const line = raw.trim();
+    if (!line) continue;
+    let dateStr = null, mDate = null;
+    if ((mDate = line.match(/(\d{1,2})\s*월\s*(\d{1,2})\s*일?/))) {
+      dateStr = fromMD(+mDate[1], +mDate[2]);
+    } else if ((mDate = line.match(/(\d{1,2})\s*[\/.]\s*(\d{1,2})/))) {
+      const mo = +mDate[1], da = +mDate[2];
+      if (mo >= 1 && mo <= 12 && da >= 1 && da <= 31) dateStr = fromMD(mo, da); else mDate = null;
+    } else if (/오늘/.test(line)) { dateStr = ymd(today); }
+    else if (/내일/.test(line)) { const d = new Date(today); d.setDate(d.getDate() + 1); dateStr = ymd(d); }
+    else if (/모레/.test(line)) { const d = new Date(today); d.setDate(d.getDate() + 2); dateStr = ymd(d); }
+    else { const w = line.match(/([일월화수목금토])\s*요일/); if (w) dateStr = nextWeekday(WD_MAP[w[1]]); }
+    if (dateStr) lastDate = dateStr;
+    const useDate = dateStr || lastDate;
+    if (!useDate) continue;
+    let pp = line;
+    if (mDate) pp = pp.replace(mDate[0], " ");
+    pp = pp.replace(/(\d{1,2})\s*([~\-])\s*(\d{1,2})\s*시/g, "$1시$2$3시");
+    pp = pp.replace(/(\d{1,2})\s*시\s*반/g, "$1:30");
+    pp = pp.replace(/(\d{1,2})\s*시\s*(\d{1,2})\s*분/g, (m, a, b) => a + ":" + pad(+b));
+    pp = pp.replace(/(\d{1,2})\s*시/g, "$1:00");
+    const ms = [...pp.matchAll(/(\d{1,2}):(\d{2})/g)];
+    if (!ms.length) continue;
+    const isPM = /(오후|저녁|밤)/.test(line);
+    const isAM = /(오전|아침|새벽)/.test(line);
+    const times = ms.map((x) => {
+      let h = +x[1]; const mi = +x[2];
+      if (isPM && h < 12) h += 12;
+      else if (isAM && h === 12) h = 0;
+      else if (!isPM && !isAM && h >= 1 && h <= 7) h += 12;
+      if (h > 23) h = 23;
+      return { h, m: mi };
+    });
+    const isRange = times.length >= 2 && /[~]|부터|까지|\-/.test(pp);
+    if (isRange) {
+      const a = times[0], b = times[1];
+      let dur = (b.h * 60 + b.m) - (a.h * 60 + a.m);
+      if (dur <= 0) dur = 60;
+      pushSlot(useDate, a, dur);
+    } else {
+      for (const t of times) pushSlot(useDate, t, 60);
+    }
+  }
+  out.sort((a, b) => new Date(a.date + "T" + a.time) - new Date(b.date + "T" + b.time));
+  return out;
+}
 
 /* ───────────────────────── styles ───────────────────────── */
 const CSS = `
@@ -463,48 +535,22 @@ function Create({ onCancel, onSaved, flash }) {
   const [expected, setExpected] = useState("");
   const [slots, setSlots] = useState([{ id: uid("s"), date: "", time: "", durationMin: 60 }]);
   const [saving, setSaving] = useState(false);
-  const [parsing, setParsing] = useState(false);
-  const [parseErr, setParseErr] = useState("");
+  const [pasteText, setPasteText] = useState("");
+  const [extractMsg, setExtractMsg] = useState("");
 
   const setSlot = (i, patch) => setSlots((s) => s.map((x, idx) => (idx === i ? { ...x, ...patch } : x)));
   const addSlot = () => setSlots((s) => [...s, { id: uid("s"), date: "", time: "", durationMin: 60 }]);
   const rmSlot = (i) => setSlots((s) => (s.length > 1 ? s.filter((_, idx) => idx !== i) : s));
   const valid = title.trim() && slots.some((s) => s.date && s.time);
-  const toBase64 = (file) => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result).split(",")[1]); r.onerror = rej; r.readAsDataURL(file); });
-  const onImage = async (file) => {
-    if (!file) return;
-    setParsing(true); setParseErr("");
-    try {
-      const b64 = await toBase64(file);
-      const res = await apiParseImage(b64, file.type || "image/png", new Date().toISOString().slice(0, 10));
-      const got = res && res.ok && Array.isArray(res.slots) ? res.slots : null;
-      if (got && got.length) {
-        setSlots(got.map((s) => ({ id: uid("s"), date: s.date || "", time: s.time || "", durationMin: Number(s.durationMin) || 60 })));
-        flash && flash(`${got.length}개 후보를 채웠어요. 확인 후 수정하세요`);
-      } else if (res && res.error === "NO_KEY") {
-        setParseErr("이미지 분석 키가 설정되지 않았어요 (Apps Script 속성 ANTHROPIC_API_KEY).");
-      } else {
-        setParseErr("일정을 찾지 못했어요. 직접 입력해 주세요.");
-      }
-    } catch {
-      setParseErr("이미지 분석에 실패했어요. 직접 입력해 주세요.");
+  const extract = () => {
+    const got = parseScheduleText(pasteText, new Date());
+    if (got.length) {
+      setSlots(got.map((s) => ({ id: uid("s"), date: s.date, time: s.time, durationMin: s.durationMin || 60 })));
+      setExtractMsg(`${got.length}개 후보를 채웠어요. 아래에서 확인·수정하세요.`);
+    } else {
+      setExtractMsg("날짜·시간을 찾지 못했어요. 예) 7/1 오후 4시 · 7/2(목) 10시");
     }
-    setParsing(false);
   };
-  useEffect(() => {
-    const onPaste = (e) => {
-      const items = e.clipboardData && e.clipboardData.items;
-      if (!items) return;
-      for (const it of items) {
-        if (it.type && it.type.indexOf("image") === 0) {
-          const file = it.getAsFile();
-          if (file) { e.preventDefault(); onImage(file); break; }
-        }
-      }
-    };
-    window.addEventListener("paste", onPaste);
-    return () => window.removeEventListener("paste", onPaste);
-  }, []);
 
   const save = async () => {
     setSaving(true);
@@ -561,12 +607,13 @@ function Create({ onCancel, onSaved, flash }) {
           <textarea className="wm-input" value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="참석자에게 보여줄 메모나 안건" />
         </div>
         <div className="wm-field">
-          <label className="wm-label">스크린샷으로 후보 채우기 (선택)</label>
-          <label className="wm-drop">
-            <input type="file" accept="image/*" style={{ display: "none" }} disabled={parsing} onChange={(e) => onImage(e.target.files && e.target.files[0])} />
-            {parsing ? "이미지에서 일정을 읽는 중…" : "📷 캡처 올리기 또는 붙여넣기(Ctrl+V) — 후보 시간을 자동으로 채워줍니다"}
-          </label>
-          {parseErr && <div className="wm-lockmsg" style={{ marginTop: 8 }}>{parseErr}</div>}
+          <label className="wm-label">대화 내용 붙여넣기로 후보 채우기 (선택)</label>
+          <textarea className="wm-input" style={{ minHeight: 96 }} value={pasteText} onChange={(e) => setPasteText(e.target.value)}
+            placeholder={"카톡 등에서 복사한 일정 텍스트를 붙여넣으세요.\n예) 7/1(수) 오후 4시 / 7/2 목 10시 / 7/6 16~18시"} />
+          <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 8, flexWrap: "wrap" }}>
+            <button className="wm-btn wm-ghost wm-sm" disabled={!pasteText.trim()} onClick={extract}>텍스트에서 일정 추출</button>
+            {extractMsg && <span style={{ fontSize: 12.5, color: "var(--muted)" }}>{extractMsg}</span>}
+          </div>
         </div>
         <div className="wm-field" style={{ marginBottom: 6 }}>
           <label className="wm-label">후보 일시 — 참석자가 이 중에서 가능한 시간을 고릅니다</label>
