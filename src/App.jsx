@@ -30,6 +30,11 @@ async function apiParseImage(image, mediaType, today) {
   const r = await fetch(GAS_URL, { method: "POST", body: JSON.stringify({ action: "parseImage", image, mediaType, today }) });
   return await r.json();
 }
+async function apiAddToCalendar(mtgId) {
+  const r = await fetch(GAS_URL, { method: "POST", body: JSON.stringify({ action: "addToCalendar", mtgId }) });
+  return await r.json();
+}
+const apiAddSlot = (mtgId, slot) => apiPost({ action: "addSlot", mtgId, slot });
 
 /* ───────────────────────── 공통 헬퍼 ───────────────────────── */
 const TYPES = ["워크숍", "회의", "강의", "온라인 중계"];
@@ -207,7 +212,7 @@ textarea.wm-input { resize:vertical; min-height:64px; }
 .wm-confirmbar .lab { font-size:11.5px; font-weight:700; color:#7FE0D2; letter-spacing:.02em; text-transform:uppercase; }
 .wm-confirmbar .big { font-size:18px; font-weight:750; letter-spacing:-.02em; margin:3px 0 13px; }
 .wm-confirmbar .row { display:flex; gap:9px; flex-wrap:wrap; }
-.wm-gcal { background:#fff; color:#172029; text-decoration:none; display:inline-flex; align-items:center; gap:7px; font-weight:650; font-size:13.5px; padding:9px 14px; border-radius:10px; }
+.wm-gcal { background:#fff; color:#172029; text-decoration:none; display:inline-flex; align-items:center; gap:7px; font-weight:650; font-size:13.5px; padding:9px 14px; border-radius:10px; border:none; font-family:inherit; cursor:pointer; }
 .wm-gcal:hover { background:#EFF2F5; }
 
 .wm-share { border:1px dashed var(--line); border-radius:13px; padding:14px 16px; margin-bottom:16px; background:#F8FAFB; }
@@ -265,7 +270,7 @@ export default function App() {
     if (!GAS_URL) return;
     try {
       const d = await apiGet();
-      const meetings = (d.meetings || []).map((m) => ({ ...m, slots: asArr(m.slots), createdAt: Number(m.createdAt) || 0 }))
+      const meetings = (d.meetings || []).map((m) => ({ ...m, slots: asArr(m.slots), createdAt: Number(m.createdAt) || 0, expected: m.expected ? Number(m.expected) : null }))
         .sort((a, b) => b.createdAt - a.createdAt);
       const responses = (d.responses || []).map((r) => ({ ...r, avail: asObj(r.avail) }));
       setData({ meetings, responses });
@@ -455,6 +460,7 @@ function Create({ onCancel, onSaved, flash }) {
   const [desc, setDesc] = useState("");
   const [dlDate, setDlDate] = useState("");
   const [dlTime, setDlTime] = useState("");
+  const [expected, setExpected] = useState("");
   const [slots, setSlots] = useState([{ id: uid("s"), date: "", time: "", durationMin: 60 }]);
   const [saving, setSaving] = useState(false);
   const [parsing, setParsing] = useState(false);
@@ -485,6 +491,20 @@ function Create({ onCancel, onSaved, flash }) {
     }
     setParsing(false);
   };
+  useEffect(() => {
+    const onPaste = (e) => {
+      const items = e.clipboardData && e.clipboardData.items;
+      if (!items) return;
+      for (const it of items) {
+        if (it.type && it.type.indexOf("image") === 0) {
+          const file = it.getAsFile();
+          if (file) { e.preventDefault(); onImage(file); break; }
+        }
+      }
+    };
+    window.addEventListener("paste", onPaste);
+    return () => window.removeEventListener("paste", onPaste);
+  }, []);
 
   const save = async () => {
     setSaving(true);
@@ -495,6 +515,7 @@ function Create({ onCancel, onSaved, flash }) {
       id: uid("m"), code: genCode(), title: title.trim(), type,
       location: location.trim(), desc: desc.trim(),
       deadline: dlDate && dlTime ? `${dlDate}T${dlTime}` : null,
+      expected: expected ? Number(expected) : null,
       slots: built, finalSlotId: null, createdAt: Date.now(),
     });
   };
@@ -530,6 +551,10 @@ function Create({ onCancel, onSaved, flash }) {
               <input type="time" className="wm-input" value={dlTime} onChange={(e) => setDlTime(e.target.value)} />
             </div>
           </div>
+          <div className="wm-field" style={{ flex: "1 1 140px" }}>
+            <label className="wm-label">응답 예상 인원 (선택)</label>
+            <input type="number" min="1" className="wm-input" value={expected} onChange={(e) => setExpected(e.target.value)} placeholder="예) 6" />
+          </div>
         </div>
         <div className="wm-field">
           <label className="wm-label">안내 (선택)</label>
@@ -539,7 +564,7 @@ function Create({ onCancel, onSaved, flash }) {
           <label className="wm-label">스크린샷으로 후보 채우기 (선택)</label>
           <label className="wm-drop">
             <input type="file" accept="image/*" style={{ display: "none" }} disabled={parsing} onChange={(e) => onImage(e.target.files && e.target.files[0])} />
-            {parsing ? "이미지에서 일정을 읽는 중…" : "📷 카톡 등 일정 논의 캡처 올리기 — 후보 시간을 자동으로 채워줍니다"}
+            {parsing ? "이미지에서 일정을 읽는 중…" : "📷 캡처 올리기 또는 붙여넣기(Ctrl+V) — 후보 시간을 자동으로 채워줍니다"}
           </label>
           {parseErr && <div className="wm-lockmsg" style={{ marginTop: 8 }}>{parseErr}</div>}
         </div>
@@ -572,6 +597,11 @@ function Detail({ mtg, responses, mode, flash, askConfirm, onBack, onRefresh, on
   const [avail, setAvail] = useState({});
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
+  const [newDate, setNewDate] = useState("");
+  const [newTime, setNewTime] = useState("");
+  const [newDur, setNewDur] = useState(60);
+  const [adding, setAdding] = useState(false);
+  const [savingCal, setSavingCal] = useState(false);
 
   useEffect(() => {
     const t = setInterval(onRefresh, 8000); // 다른 사람 응답 자동 반영
@@ -585,6 +615,7 @@ function Detail({ mtg, responses, mode, flash, askConfirm, onBack, onRefresh, on
   const locked = closed && !isHost;
   const rt = remainText(mtg.deadline);
   const total = responses.length;
+  const denom = mtg.expected && mtg.expected > 0 ? mtg.expected : total;
   const tally = mtg.slots.map((s) => {
     const yes = responses.filter((r) => r.avail && r.avail[s.id]);
     return { slot: s, yesNames: yes.map((r) => r.name), no: responses.filter((r) => !(r.avail && r.avail[s.id])).map((r) => r.name), count: yes.length };
@@ -617,6 +648,24 @@ function Detail({ mtg, responses, mode, flash, askConfirm, onBack, onRefresh, on
     title: "모임을 삭제할까요?", msg: "후보 일정과 참석자 응답이 시트에서 모두 사라집니다.",
     onYes: async () => { await apiDeleteMeeting(mtg.id); await onDeleted(); },
   });
+  const addMySlot = async () => {
+    if (!newDate || !newTime) return;
+    setAdding(true);
+    const sid = uid("s");
+    await apiAddSlot(mtg.id, { id: sid, start: `${newDate}T${newTime}`, durationMin: Number(newDur) || 60 });
+    await onRefresh();
+    setAvail((a) => ({ ...a, [sid]: true }));
+    setNewDate(""); setNewTime(""); setNewDur(60);
+    setAdding(false);
+    flash("가능한 시간을 추가했어요");
+  };
+  const saveToCal = async () => {
+    setSavingCal(true);
+    const res = await apiAddToCalendar(mtg.id);
+    setSavingCal(false);
+    if (res && res.ok) flash("내 구글 캘린더에 저장했어요");
+    else flash((res && res.error) || "캘린더 저장 실패");
+  };
 
   return (
     <div>
@@ -630,7 +679,7 @@ function Detail({ mtg, responses, mode, flash, askConfirm, onBack, onRefresh, on
       </div>
       <div className="wm-info" style={{ marginTop: 12 }}>
         {mtg.location && <span>📍 {mtg.location}</span>}
-        <span>👥 응답 {total}명</span>
+        <span>👥 응답 {total}{mtg.expected ? "/" + mtg.expected : ""}명</span>
         <span>🗓 후보 {mtg.slots.length}개</span>
         {rt && <span className={"wm-dl" + (closed ? " over" : statusOf(mtg).k === "soon" ? " soon" : "")}>⏳ {rt}</span>}
       </div>
@@ -655,6 +704,7 @@ function Detail({ mtg, responses, mode, flash, askConfirm, onBack, onRefresh, on
           <div className="big">{fmtSlot(finalSlot.start)} · {fmtRange(finalSlot.start, finalSlot.durationMin)}</div>
           <div className="row">
             <a className="wm-gcal" href={gcalUrl(mtg, finalSlot)} target="_blank" rel="noreferrer">📅 구글 캘린더에 추가</a>
+            {isHost && <button className="wm-gcal" disabled={savingCal} onClick={saveToCal}>{savingCal ? "저장 중…" : "💾 내 캘린더에 저장"}</button>}
             {isHost && <button className="wm-btn wm-ghost wm-sm" onClick={() => setFinal(finalSlot.id)}>확정 취소</button>}
           </div>
         </div>
@@ -676,10 +726,23 @@ function Detail({ mtg, responses, mode, flash, askConfirm, onBack, onRefresh, on
             </button>
           ))}
         </div>
+        {!locked && (
+          <div style={{ marginTop: 12 }}>
+            <div className="wm-label" style={{ marginBottom: 7 }}>원하는 시간이 없나요? 직접 추가하세요</div>
+            <div className="wm-slotrow">
+              <input type="date" className="wm-input" value={newDate} onChange={(e) => setNewDate(e.target.value)} />
+              <input type="time" className="wm-input" value={newTime} onChange={(e) => setNewTime(e.target.value)} />
+              <select className="wm-input" style={{ flex: "0 0 92px" }} value={newDur} onChange={(e) => setNewDur(e.target.value)}>
+                <option value={30}>30분</option><option value={60}>1시간</option><option value={90}>1.5시간</option><option value={120}>2시간</option><option value={180}>3시간</option>
+              </select>
+              <button className="wm-btn wm-ghost wm-sm" disabled={adding || !newDate || !newTime} onClick={addMySlot}>{adding ? "추가 중…" : "추가"}</button>
+            </div>
+          </div>
+        )}
         <div className="wm-field" style={{ marginTop: 14, marginBottom: 0 }}>
           <input className="wm-input" value={note} onChange={(e) => setNote(e.target.value)} placeholder="메모 (선택) — 예) 오전만 가능" />
         </div>
-        <button className="wm-btn wm-pri" style={{ marginTop: 16, opacity: locked || busy ? 0.45 : 1 }} disabled={locked || busy} onClick={submit}>{busy ? "저장 중…" : "내 일정 저장"}</button>
+        <button className="wm-btn wm-pri" style={{ marginTop: 16, opacity: locked || busy ? 0.45 : 1 }} disabled={locked || busy} onClick={submit}>{busy ? "저장 중…" : "참여 가능 일정 선택 완료"}</button>
       </div>
 
       <div className="wm-card wm-sec">
@@ -689,8 +752,8 @@ function Detail({ mtg, responses, mode, flash, askConfirm, onBack, onRefresh, on
         ) : (
           <div className="wm-rank">
             {ranked.map((t, i) => {
-              const ratio = total ? t.count / total : 0;
-              const all = t.count === total && total > 0;
+              const ratio = denom ? Math.min(1, t.count / denom) : 0;
+              const all = denom > 0 && t.count >= denom;
               const isFinal = mtg.finalSlotId === t.slot.id;
               return (
                 <div key={t.slot.id} className={"wm-slot" + (all ? " all" : "") + (isFinal ? " final" : "")}>
@@ -701,7 +764,7 @@ function Detail({ mtg, responses, mode, flash, askConfirm, onBack, onRefresh, on
                       <div className="wm-when2">{fmtSlot(t.slot.start)}{all && <span className="wm-allbadge">모두 가능</span>}</div>
                       <div className="wm-time2">{fmtRange(t.slot.start, t.slot.durationMin)}</div>
                     </div>
-                    <span className="wm-count">{t.count}/{total}</span>
+                    <span className="wm-count">{t.count}/{denom}</span>
                   </div>
                   {(t.yesNames.length > 0 || t.no.length > 0) && (
                     <div className="wm-people">
