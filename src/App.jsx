@@ -38,6 +38,31 @@ const apiAddSlot = (mtgId, slot) => apiPost({ action: "addSlot", mtgId, slot });
 /* ───────────────────────── 공통 헬퍼 ───────────────────────── */
 const TYPES = ["워크숍", "회의", "강의", "온라인 중계"];
 const TYPE_ICON = { "워크숍": "🧩", "회의": "💬", "강의": "🎓", "온라인 중계": "📡" };
+const TYPE_ICON_NAME = { "워크숍": "blocks", "회의": "chat", "강의": "book", "온라인 중계": "broadcast" };
+function Icon({ name, size = 16, className }) {
+  const P = {
+    cal: <><rect x="3" y="4.5" width="18" height="16" rx="2.5" /><path d="M3 9h18M8 3v3M16 3v3" /></>,
+    caladd: <><rect x="3" y="4.5" width="18" height="16" rx="2.5" /><path d="M3 9.5h18M8 3v3M16 3v3M12 13v4M10 15h4" /></>,
+    plus: <path d="M12 5v14M5 12h14" />,
+    clock: <><circle cx="12" cy="12" r="8.5" /><path d="M12 7.5V12l3 2" /></>,
+    pin: <><path d="M12 21s7-5.2 7-11a7 7 0 1 0-14 0c0 5.8 7 11 7 11Z" /><circle cx="12" cy="10" r="2.4" /></>,
+    users: <><circle cx="9" cy="8" r="3.2" /><path d="M3.6 19a5.5 5.5 0 0 1 10.8 0" /><path d="M16 6.6a3 3 0 0 1 0 5.8M17 19a5 5 0 0 0-2.4-4.2" /></>,
+    check: <path d="M5 12.5l4.5 4.5L19 7.5" />,
+    user: <><circle cx="12" cy="8" r="3.4" /><path d="M5.5 20a6.5 6.5 0 0 1 13 0" /></>,
+    blocks: <><rect x="3.5" y="3.5" width="7" height="7" rx="1.5" /><rect x="13.5" y="3.5" width="7" height="7" rx="1.5" /><rect x="3.5" y="13.5" width="7" height="7" rx="1.5" /><rect x="13.5" y="13.5" width="7" height="7" rx="1.5" /></>,
+    chat: <path d="M4 5.5h16A1.5 1.5 0 0 1 21.5 7v8A1.5 1.5 0 0 1 20 16.5H9.5L5 20v-3.5H4A1.5 1.5 0 0 1 2.5 15V7A1.5 1.5 0 0 1 4 5.5Z" />,
+    book: <><path d="M12 6.5C10.5 5.2 8.6 4.5 5.5 4.5V18c3.1 0 5 .7 6.5 2" /><path d="M12 6.5C13.5 5.2 15.4 4.5 18.5 4.5V18c-3.1 0-5 .7-6.5 2" /><path d="M12 6.5V20" /></>,
+    broadcast: <><circle cx="12" cy="12" r="2" /><path d="M8.6 8.6a4.8 4.8 0 0 0 0 6.8M15.4 8.6a4.8 4.8 0 0 1 0 6.8M6.2 6.2a8 8 0 0 0 0 11.6M17.8 6.2a8 8 0 0 1 0 11.6" /></>,
+  };
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className={className} style={{ flex: "none" }}>
+      {P[name] || null}
+    </svg>
+  );
+}
+function TypeTag({ type }) {
+  return <span className="wm-type"><Icon name={TYPE_ICON_NAME[type] || "cal"} size={13} /> {type}</span>;
+}
 const CODE_ABC = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 const uid = (p = "") => p + Math.random().toString(36).slice(2, 8) + Date.now().toString(36).slice(-4);
 const genCode = () => Array.from({ length: 6 }, () => CODE_ABC[Math.floor(Math.random() * CODE_ABC.length)]).join("");
@@ -181,7 +206,7 @@ function parseScheduleText(text, todayDate) {
 const CSS = `
 .wm * { box-sizing: border-box; }
 .wm {
-  --bg:#EBEEF3; --panel:#FFFFFF; --ink:#172029; --muted:#6A7886; --faint:#9AA7B4;
+  --bg:#F2F5F8; --panel:#FFFFFF; --ink:#172029; --muted:#6A7886; --faint:#9AA7B4;
   --line:#E2E8EE; --brand:#0E8C7F; --brand-dk:#0A6B61; --brand-rgb:14,140,127;
   --amber:#D98A24; --bad:#C24B3A; --clay:#C2603C; --shadow:0 1px 2px rgba(23,32,41,.05),0 8px 24px rgba(23,32,41,.06);
   --grad:linear-gradient(135deg,#13A697,#0B7065); --ring:0 0 0 3px rgba(14,140,127,.16); --e1:0 1px 2px rgba(23,32,41,.06),0 2px 6px rgba(23,32,41,.05); --e2:0 6px 16px rgba(23,32,41,.08),0 20px 44px rgba(23,32,41,.09);
@@ -190,7 +215,8 @@ const CSS = `
 }
 .wm-wrap { max-width:840px; margin:0 auto; padding:0 18px 96px; }
 .wm-top { display:flex; align-items:flex-end; justify-content:space-between; gap:16px; padding:28px 2px 22px; }
-.wm-brand { display:flex; align-items:baseline; gap:10px; cursor:pointer; }
+.wm-brand { display:flex; align-items:center; gap:10px; cursor:pointer; }
+.wm-logomark { width:30px; height:30px; border-radius:9px; background:var(--grad); color:#fff; display:flex; align-items:center; justify-content:center; box-shadow:0 4px 12px rgba(14,140,127,.32); }
 .wm-logo { font-size:25px; font-weight:800; letter-spacing:-.03em; color:var(--ink); }
 .wm-logo b { color:var(--brand); }
 .wm-sub { font-size:12.5px; color:var(--muted); letter-spacing:-.01em; }
@@ -217,8 +243,7 @@ const CSS = `
 .wm-acc { width:100%; text-align:left; background:none; border:none; font-family:inherit; cursor:pointer; padding:0; color:inherit; }
 .wm-titlerow { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
 .wm-mtitle { font-size:17px; font-weight:750; letter-spacing:-.02em; margin:0; }
-.wm-type { font-size:11px; font-weight:700; padding:3px 8px; border-radius:7px; letter-spacing:-.01em;
-  background:rgba(var(--brand-rgb),.1); color:var(--brand-dk); white-space:nowrap; }
+.wm-type { display:inline-flex; align-items:center; gap:5px; font-size:11px; font-weight:700; padding:4px 9px; border-radius:8px; letter-spacing:-.01em; background:rgba(var(--brand-rgb),.1); color:var(--brand-dk); white-space:nowrap; }
 .wm-meta { font-size:12.5px; color:var(--muted); display:flex; gap:14px; flex-wrap:wrap; margin-top:9px; }
 .wm-meta span { display:inline-flex; align-items:center; gap:5px; }
 .wm-badge { font-size:11px; font-weight:700; padding:4px 9px; border-radius:999px; letter-spacing:-.01em; white-space:nowrap; }
@@ -318,7 +343,8 @@ textarea.wm-input { resize:vertical; min-height:64px; }
 .wm-back { background:none; border:none; color:var(--muted); font-family:inherit; font-size:13.5px; cursor:pointer; padding:6px 0; margin:6px 0 2px; display:inline-flex; align-items:center; gap:5px; }
 .wm-back:hover { color:var(--ink); }
 .wm-h1 { font-size:22px; font-weight:800; letter-spacing:-.03em; margin:4px 0 4px; }
-.wm-info { font-size:13px; color:var(--muted); margin:0 0 18px; display:flex; gap:13px; flex-wrap:wrap; align-items:center; }
+.wm-info { font-size:13px; color:var(--muted); margin:0 0 18px; display:flex; gap:14px; flex-wrap:wrap; align-items:center; }
+.wm-info span { display:inline-flex; align-items:center; gap:5px; }
 .wm-spin { width:22px; height:22px; border:2.5px solid var(--line); border-top-color:var(--brand); border-radius:50%; animation:wm-rot .7s linear infinite; margin:48px auto; }
 @keyframes wm-rot { to { transform:rotate(360deg); } }
 .wm-note { font-size:12px; color:var(--faint); background:#F4F6F9; border:1px solid var(--line); border-radius:10px; padding:11px 13px; line-height:1.55; margin-top:14px; }
@@ -360,7 +386,7 @@ textarea.wm-input { resize:vertical; min-height:64px; }
 .wm-feats { display:flex; flex-wrap:wrap; gap:9px; margin-top:22px; }
 .wm-feat { display:inline-flex; align-items:center; gap:8px; font-size:12.5px; font-weight:650; color:var(--ink);
   background:#fff; border:1px solid var(--line); border-radius:12px; padding:8px 13px 8px 9px; box-shadow:var(--e1); }
-.wm-feat .ic { width:24px; height:24px; border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:13px; background:rgba(14,140,127,.12); }
+.wm-feat .ic { width:24px; height:24px; border-radius:8px; display:flex; align-items:center; justify-content:center; color:var(--brand-dk); background:rgba(14,140,127,.12); }
 .wm-sectionlabel { display:flex; align-items:center; gap:10px; font-size:12px; font-weight:700; color:var(--muted); letter-spacing:-.01em; margin:0 2px 15px; }
 .wm-sectionlabel::after { content:""; flex:1; height:1px; background:linear-gradient(90deg, var(--line), transparent); }
 .wm-bricklist { display:flex; flex-direction:column; gap:14px; }
@@ -537,6 +563,7 @@ export default function App() {
       <div className="wm-wrap">
         <div className="wm-top">
           <div className="wm-brand" onClick={goHome}>
+            <span className="wm-logomark"><Icon name="check" size={16} /></span>
             <span className="wm-logo">우모<b>가</b></span>
             <span className="wm-sub">우리가 모두 가능한 시간</span>
           </div>
@@ -634,9 +661,9 @@ function CodeEntry({ onEnter }) {
         <div className="tag">우리가 모두 가능한 시간</div>
         <p>여러 사람의 가능한 시간을 모아 <b>모두가 되는 시간</b>을 찾아주는 도구예요. 주최자가 올린 후보 중 가능한 시간을 체크하고, <b>후보에 없으면 내가 가능한 시간을 직접 추가</b>할 수도 있어요. 가장 많이 겹치는 시간이 자동으로 정리되고, 확정된 일정은 <b>구글 캘린더에 등록할 수 있어요</b>.</p>
         <div className="wm-feats">
-          <span className="wm-feat"><span className="ic">🗓️</span> 시간 자동 취합</span>
-          <span className="wm-feat"><span className="ic">➕</span> 내 시간 추가</span>
-          <span className="wm-feat"><span className="ic">📅</span> 캘린더 등록</span>
+          <span className="wm-feat"><span className="ic"><Icon name="cal" size={14} /></span> 시간 자동 취합</span>
+          <span className="wm-feat"><span className="ic"><Icon name="plus" size={14} /></span> 내 시간 추가</span>
+          <span className="wm-feat"><span className="ic"><Icon name="caladd" size={14} /></span> 캘린더 등록</span>
         </div>
       </div>
       {active && active.length === 0 && (<div className="wm-brickempty">지금 진행 중인 모임이 없어요.</div>)}
@@ -650,12 +677,12 @@ function CodeEntry({ onEnter }) {
                 <button className="wm-acc" onClick={() => toggle(m.id)}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
                     <div className="wm-titlerow">
-                      {m.type && <span className="wm-type">{TYPE_ICON[m.type] || ""} {m.type}</span>}
+                      {m.type && <TypeTag type={m.type} />}
                       <h3 className="wm-mtitle">{m.title}</h3>
                     </div>
                     <span className="wm-caret">{openId === m.id ? "▲" : "▼"}</span>
                   </div>
-                  {m.deadline && <div className="wm-meta" style={{ marginTop: 8 }}><span className="wm-dl">⏳ {remainText(m.deadline)}</span></div>}
+                  {m.deadline && <div className="wm-meta" style={{ marginTop: 8 }}><span className="wm-dl"><Icon name="clock" size={13} /> {remainText(m.deadline)}</span></div>}
                 </button>
                 {openId === m.id && (
                   <div className="wm-brickfoot">
@@ -701,16 +728,16 @@ function Home({ meetings, isAdmin, onAddHost, onOpen, onNew }) {
             <div key={m.id} className="wm-card wm-mcard" onClick={() => onOpen(m.id)}>
               <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start" }}>
                 <div className="wm-titlerow">
-                  {m.type && <span className="wm-type">{TYPE_ICON[m.type] || ""} {m.type}</span>}
+                  {m.type && <TypeTag type={m.type} />}
                   <h3 className="wm-mtitle">{m.title}</h3>
                 </div>
                 <span className={"wm-badge " + st.k}>{st.t}</span>
               </div>
               <div className="wm-meta">
-                <span>🗓 {span}</span>
-                {m.location && <span>📍 {m.location}</span>}
-                {rt && <span className={"wm-dl" + (st.k === "soon" ? " soon" : st.k === "closed" ? " over" : "")}>⏳ {rt}</span>}
-                {isAdmin && m.owner && <span>👤 {m.owner}</span>}
+                <span><Icon name="cal" size={13} /> {span}</span>
+                {m.location && <span><Icon name="pin" size={13} /> {m.location}</span>}
+                {rt && <span className={"wm-dl" + (st.k === "soon" ? " soon" : st.k === "closed" ? " over" : "")}><Icon name="clock" size={13} /> {rt}</span>}
+                {isAdmin && m.owner && <span><Icon name="user" size={13} /> {m.owner}</span>}
               </div>
             </div>
           );
@@ -925,7 +952,7 @@ function Detail({ mtg, responses, mode, hostPin, flash, askConfirm, onBack, onRe
       <button className="wm-back" onClick={onBack}>← 목록</button>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
         <div className="wm-titlerow" style={{ marginTop: 4 }}>
-          {mtg.type && <span className="wm-type">{TYPE_ICON[mtg.type] || ""} {mtg.type}</span>}
+          {mtg.type && <TypeTag type={mtg.type} />}
           <h1 className="wm-h1" style={{ margin: 0 }}>{mtg.title}</h1>
         </div>
         {isHost && (
@@ -936,10 +963,10 @@ function Detail({ mtg, responses, mode, hostPin, flash, askConfirm, onBack, onRe
         )}
       </div>
       <div className="wm-info" style={{ marginTop: 12 }}>
-        {mtg.location && <span>📍 {mtg.location}</span>}
-        <span>👥 응답 {total}{mtg.expected ? "/" + mtg.expected : ""}명</span>
-        <span>🗓 후보 {mtg.slots.length}개</span>
-        {rt && <span className={"wm-dl" + (closed ? " over" : statusOf(mtg).k === "soon" ? " soon" : "")}>⏳ {rt}</span>}
+        {mtg.location && <span><Icon name="pin" size={13} /> {mtg.location}</span>}
+        <span><Icon name="users" size={13} /> 응답 {total}{mtg.expected ? "/" + mtg.expected : ""}명</span>
+        <span><Icon name="cal" size={13} /> 후보 {mtg.slots.length}개</span>
+        {rt && <span className={"wm-dl" + (closed ? " over" : statusOf(mtg).k === "soon" ? " soon" : "")}><Icon name="clock" size={13} /> {rt}</span>}
       </div>
       {mtg.desc && <div className="wm-note" style={{ marginTop: 0, marginBottom: 16 }}>{mtg.desc}</div>}
 
@@ -961,8 +988,8 @@ function Detail({ mtg, responses, mode, hostPin, flash, askConfirm, onBack, onRe
           <div className="lab">확정된 시간</div>
           <div className="big">{fmtSlot(finalSlot.start)} · {fmtRange(finalSlot.start, finalSlot.durationMin)}</div>
           <div className="row">
-            <a className="wm-gcal" href={gcalUrl(mtg, finalSlot)} target="_blank" rel="noreferrer">📅 구글 캘린더에 추가</a>
-            {isHost && <button className="wm-gcal" disabled={savingCal} onClick={saveToCal}>{savingCal ? "저장 중…" : "💾 내 캘린더에 저장"}</button>}
+            <a className="wm-gcal" href={gcalUrl(mtg, finalSlot)} target="_blank" rel="noreferrer"><Icon name="caladd" size={15} /> 구글 캘린더에 추가</a>
+            {isHost && <button className="wm-gcal" disabled={savingCal} onClick={saveToCal}>{savingCal ? "저장 중…" : <><Icon name="check" size={15} /> 내 캘린더에 저장</>}</button>}
             {isHost && <button className="wm-btn wm-ghost wm-sm" onClick={() => setFinal(finalSlot.id)}>확정 취소</button>}
           </div>
         </div>
