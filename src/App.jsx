@@ -184,6 +184,7 @@ const CSS = `
   --bg:#EBEEF3; --panel:#FFFFFF; --ink:#172029; --muted:#6A7886; --faint:#9AA7B4;
   --line:#E2E8EE; --brand:#0E8C7F; --brand-dk:#0A6B61; --brand-rgb:14,140,127;
   --amber:#D98A24; --bad:#C24B3A; --clay:#C2603C; --shadow:0 1px 2px rgba(23,32,41,.05),0 8px 24px rgba(23,32,41,.06);
+  --grad:linear-gradient(135deg,#13A697,#0B7065); --ring:0 0 0 3px rgba(14,140,127,.16); --e1:0 1px 2px rgba(23,32,41,.06),0 2px 6px rgba(23,32,41,.05); --e2:0 6px 16px rgba(23,32,41,.08),0 20px 44px rgba(23,32,41,.09);
   font-family:'Pretendard',-apple-system,BlinkMacSystemFont,'Apple SD Gothic Neo','Malgun Gothic','Segoe UI',sans-serif;
   color:var(--ink); background:var(--bg); min-height:100vh; line-height:1.5; -webkit-font-smoothing:antialiased;
 }
@@ -201,18 +202,18 @@ const CSS = `
 .wm-btn:active { transform:translateY(1px); }
 .wm-btn:focus-visible { outline:2px solid var(--brand); outline-offset:2px; }
 .wm-btn:disabled { cursor:default; }
-.wm-pri { background:var(--brand); color:#fff; }
-.wm-pri:hover { background:var(--brand-dk); }
+.wm-pri { background:var(--grad); color:#fff; box-shadow:0 1px 2px rgba(10,107,97,.3), 0 6px 16px rgba(14,140,127,.26); }
+.wm-pri:hover { filter:brightness(1.05); box-shadow:0 2px 4px rgba(10,107,97,.32), 0 10px 22px rgba(14,140,127,.34); }
 .wm-ghost { background:#fff; color:var(--ink); border:1px solid var(--line); }
 .wm-ghost:hover { border-color:#C9D3DC; }
 .wm-danger { background:#fff; color:var(--bad); border:1px solid #EAD2CD; }
 .wm-danger:hover { background:#FDF4F2; }
 .wm-sm { font-size:12.5px; padding:7px 11px; border-radius:9px; }
 
-.wm-card { background:var(--panel); border:1px solid var(--line); border-radius:16px; box-shadow:var(--shadow); }
+.wm-card { background:var(--panel); border:1px solid var(--line); border-radius:16px; box-shadow:var(--e1); }
 .wm-list { display:flex; flex-direction:column; gap:12px; }
 .wm-mcard { padding:18px 20px; cursor:pointer; transition:border-color .15s, transform .08s; }
-.wm-mcard:hover { border-color:#C7D3DC; transform:translateY(-1px); }
+.wm-mcard:hover { border-color:#CFE3DF; transform:translateY(-2px); box-shadow:var(--e2); }
 .wm-acc { width:100%; text-align:left; background:none; border:none; font-family:inherit; cursor:pointer; padding:0; color:inherit; }
 .wm-titlerow { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
 .wm-mtitle { font-size:17px; font-weight:750; letter-spacing:-.02em; margin:0; }
@@ -252,14 +253,15 @@ textarea.wm-input { resize:vertical; min-height:64px; }
 .wm-x:hover { background:#E7EBEF; color:var(--bad); }
 
 .wm-sec { padding:20px 22px; }
-.wm-sec h2 { font-size:14px; font-weight:750; letter-spacing:-.02em; margin:0 0 2px; }
+.wm-sec h2 { font-size:14px; font-weight:750; letter-spacing:-.02em; margin:0 0 2px; position:relative; padding-left:13px; }
+.wm-sec h2::before { content:""; position:absolute; left:0; top:2px; bottom:2px; width:4px; border-radius:3px; background:var(--grad); }
 .wm-sec .hint { font-size:12.5px; color:var(--muted); margin:0 0 16px; }
 
 .wm-chips { display:flex; flex-direction:column; gap:8px; }
 .wm-chip { display:flex; align-items:center; gap:11px; width:100%; text-align:left; cursor:pointer;
-  border:1.5px solid var(--line); background:#fff; border-radius:11px; padding:11px 14px; font-family:inherit; transition:.12s; }
-.wm-chip:hover { border-color:#C7D3DC; }
-.wm-chip.on { border-color:var(--brand); background:rgba(var(--brand-rgb),.06); }
+  border:1.5px solid var(--line); background:#fff; border-radius:12px; padding:12px 14px; font-family:inherit; transition:.14s; box-shadow:var(--e1); }
+.wm-chip:hover { border-color:#CFE3DF; transform:translateY(-1px); }
+.wm-chip.on { border-color:var(--brand); background:linear-gradient(0deg, rgba(14,140,127,.08), rgba(14,140,127,.03)); }
 .wm-chip:disabled { cursor:default; opacity:.55; }
 .wm-chip:disabled:hover { border-color:var(--line); }
 .wm-tick { width:20px; height:20px; border-radius:6px; border:1.5px solid var(--faint); flex:none; display:flex; align-items:center; justify-content:center; color:#fff; transition:.12s; }
@@ -268,26 +270,27 @@ textarea.wm-input { resize:vertical; min-height:64px; }
 .wm-chip .dur { font-size:12px; color:var(--muted); margin-left:auto; }
 
 .wm-rank { display:flex; flex-direction:column; gap:10px; }
-.wm-slot { border:1px solid var(--line); border-radius:13px; padding:13px 15px; position:relative; overflow:hidden; transition:border-color .15s; }
-.wm-slot .fill { position:absolute; inset:0; right:auto; background:rgba(var(--brand-rgb),.10); z-index:0; transition:width .5s cubic-bezier(.2,.7,.2,1); }
-.wm-slot.all { border-color:var(--brand); box-shadow:0 0 0 3px rgba(var(--brand-rgb),.14); }
-.wm-slot.final { border-color:#172029; box-shadow:0 0 0 3px rgba(23,32,41,.12); }
+.wm-slot { border:1px solid var(--line); border-radius:14px; padding:14px 16px; position:relative; overflow:hidden; box-shadow:var(--e1); transition:transform .14s, box-shadow .14s; }
+.wm-slot:hover { transform:translateY(-1px); box-shadow:var(--e2); }
+.wm-slot .fill { position:absolute; inset:0; right:auto; background:linear-gradient(90deg, rgba(14,140,127,.18), rgba(14,140,127,.06)); z-index:0; transition:width .55s cubic-bezier(.2,.7,.2,1); }
+.wm-slot.all { border-color:var(--brand); box-shadow:var(--ring), var(--e1); }
+.wm-slot.final { border-color:var(--ink); box-shadow:0 0 0 3px rgba(23,32,41,.1), var(--e1); }
 .wm-slot > * { position:relative; z-index:1; }
 .wm-slothead { display:flex; align-items:center; gap:11px; }
-.wm-no { width:24px; height:24px; border-radius:7px; background:#172029; color:#fff; font-size:12px; font-weight:800; display:flex; align-items:center; justify-content:center; flex:none; }
-.wm-slot.all .wm-no { background:var(--brand); }
+.wm-no { width:26px; height:26px; border-radius:50%; background:#ECF1F4; color:var(--muted); font-size:12px; font-weight:800; display:flex; align-items:center; justify-content:center; flex:none; }
+.wm-slot.all .wm-no { background:var(--grad); color:#fff; }
 .wm-when2 { font-size:14.5px; font-weight:700; letter-spacing:-.02em; }
 .wm-time2 { font-size:12px; color:var(--muted); }
-.wm-count { margin-left:auto; font-size:13px; font-weight:750; color:var(--brand-dk); white-space:nowrap; }
-.wm-allbadge { margin-left:8px; font-size:10.5px; font-weight:800; color:#fff; background:var(--brand); padding:3px 7px; border-radius:999px; }
+.wm-count { margin-left:auto; font-size:12.5px; font-weight:800; color:var(--brand-dk); white-space:nowrap; background:rgba(14,140,127,.1); padding:3px 9px; border-radius:999px; }
+.wm-allbadge { margin-left:8px; font-size:10.5px; font-weight:800; color:#fff; background:var(--grad); padding:3px 8px; border-radius:999px; }
 .wm-people { margin-top:9px; display:flex; flex-wrap:wrap; gap:5px; }
 .wm-p { font-size:11.5px; padding:3px 8px; border-radius:7px; font-weight:600; }
 .wm-p.yes { background:rgba(var(--brand-rgb),.14); color:var(--brand-dk); }
 .wm-p.no { background:#F0F2F5; color:var(--faint); text-decoration:line-through; }
 .wm-pick { margin-top:11px; }
 
-.wm-confirmbar { background:#172029; color:#fff; border-radius:13px; padding:16px 18px; margin-bottom:16px; }
-.wm-confirmbar .lab { font-size:11.5px; font-weight:700; color:#7FE0D2; letter-spacing:.02em; text-transform:uppercase; }
+.wm-confirmbar { background:linear-gradient(135deg,#0E8C7F,#0A6B61); color:#fff; border-radius:16px; padding:18px 20px; margin-bottom:16px; box-shadow:0 10px 30px rgba(14,140,127,.3); }
+.wm-confirmbar .lab { font-size:11px; font-weight:700; color:#CFF6EE; letter-spacing:.08em; text-transform:uppercase; }
 .wm-confirmbar .big { font-size:18px; font-weight:750; letter-spacing:-.02em; margin:3px 0 13px; }
 .wm-confirmbar .row { display:flex; gap:9px; flex-wrap:wrap; }
 .wm-gcal { background:#fff; color:#172029; text-decoration:none; display:inline-flex; align-items:center; gap:7px; font-weight:650; font-size:13.5px; padding:9px 14px; border-radius:10px; border:none; font-family:inherit; cursor:pointer; }
@@ -338,35 +341,39 @@ textarea.wm-input { resize:vertical; min-height:64px; }
 .wm-popitem:hover { background:#F1F4F7; }
 .wm-backdrop { position:fixed; inset:0; z-index:39; }
 .wm-footer { text-align:center; font-size:12px; color:var(--faint); margin-top:36px; }
-/* ── brick style (메인 화면) ── */
-.wm-hero { position:relative; overflow:hidden; background:#FFFDF8; color:var(--ink); border:2.5px solid var(--ink);
-  border-radius:16px; padding:30px 28px; box-shadow:8px 8px 0 rgba(14,140,127,.85); }
-.wm-hero::before { content:""; position:absolute; inset:0; opacity:.06; pointer-events:none;
-  background-image:
-    linear-gradient(#172029 2px, transparent 2px),
-    linear-gradient(90deg, #172029 2px, transparent 2px),
-    linear-gradient(90deg, #172029 2px, transparent 2px);
-  background-size:100% 30px, 60px 30px, 60px 30px;
-  background-position:0 0, 0 0, 30px 15px; }
+/* ── landing (SaaS) ── */
+.wm-hero { position:relative; overflow:hidden; border-radius:20px; padding:34px 30px;
+  background:linear-gradient(180deg,#FFFFFF,#F6FBFA); border:1px solid var(--line); box-shadow:var(--e2); }
+.wm-hero::before { content:""; position:absolute; inset:0; pointer-events:none;
+  background:radial-gradient(440px 220px at 100% -12%, rgba(14,140,127,.13), transparent 62%); }
+.wm-hero::after { content:""; position:absolute; inset:0; pointer-events:none; opacity:.6;
+  background-image:radial-gradient(rgba(23,32,41,.06) 1px, transparent 1.5px); background-size:18px 18px;
+  -webkit-mask-image:linear-gradient(180deg,#000,transparent 72%); mask-image:linear-gradient(180deg,#000,transparent 72%); }
 .wm-hero > * { position:relative; z-index:1; }
-.wm-hero h2 { font-size:32px; font-weight:850; letter-spacing:-.045em; margin:0; color:var(--ink); }
+.wm-eyebrow { display:inline-block; font-size:11px; font-weight:700; letter-spacing:.08em; text-transform:uppercase;
+  color:var(--brand-dk); background:rgba(14,140,127,.1); padding:5px 11px; border-radius:999px; margin-bottom:15px; }
+.wm-hero h2 { font-size:34px; font-weight:850; letter-spacing:-.045em; margin:0; color:var(--ink); line-height:1.05; }
 .wm-hero h2 b { color:var(--brand); }
-.wm-hero .tag { font-size:13px; color:var(--muted); font-weight:600; margin-top:4px; }
-.wm-hero p { font-size:13.5px; color:#3D4853; line-height:1.7; margin:16px 0 0; }
+.wm-hero .tag { font-size:14px; color:var(--muted); font-weight:600; margin-top:8px; }
+.wm-hero p { font-size:13.5px; color:#46535F; line-height:1.72; margin:16px 0 0; max-width:56ch; }
 .wm-hero p b { color:var(--brand-dk); font-weight:700; }
-.wm-bricklabel { display:inline-block; background:#fff; color:var(--ink); border:2px solid var(--ink); font-size:11.5px; font-weight:700;
-  letter-spacing:-.01em; padding:5px 12px; border-radius:8px; box-shadow:3px 3px 0 rgba(14,140,127,.85); margin:0 0 16px 3px; }
+.wm-feats { display:flex; flex-wrap:wrap; gap:9px; margin-top:22px; }
+.wm-feat { display:inline-flex; align-items:center; gap:8px; font-size:12.5px; font-weight:650; color:var(--ink);
+  background:#fff; border:1px solid var(--line); border-radius:12px; padding:8px 13px 8px 9px; box-shadow:var(--e1); }
+.wm-feat .ic { width:24px; height:24px; border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:13px; background:rgba(14,140,127,.12); }
+.wm-sectionlabel { display:flex; align-items:center; gap:10px; font-size:12px; font-weight:700; color:var(--muted); letter-spacing:-.01em; margin:0 2px 15px; }
+.wm-sectionlabel::after { content:""; flex:1; height:1px; background:linear-gradient(90deg, var(--line), transparent); }
 .wm-bricklist { display:flex; flex-direction:column; gap:14px; }
-.wm-brickcard { background:#fff; border:2px solid var(--ink); border-left:7px solid var(--brand); border-radius:12px;
-  box-shadow:5px 5px 0 rgba(23,32,41,.16); overflow:hidden; transition:transform .1s ease, box-shadow .1s ease; }
-.wm-brickcard.alt { border-left-color:var(--clay); box-shadow:5px 5px 0 rgba(194,96,60,.3); }
-.wm-brickcard:hover { transform:translate(-1px,-1px); box-shadow:7px 7px 0 rgba(23,32,41,.2); }
-.wm-brickcard.alt:hover { box-shadow:7px 7px 0 rgba(194,96,60,.38); }
-.wm-brickcard .wm-acc { padding:15px 18px; }
+.wm-vcard { background:#fff; border:1px solid var(--line); border-radius:16px; box-shadow:var(--e1); overflow:hidden;
+  transition:transform .14s ease, box-shadow .14s ease, border-color .14s ease; }
+.wm-vcard:hover { transform:translateY(-2px); box-shadow:var(--e2); border-color:#CFE3DF; }
+.wm-vstripe { height:3px; background:var(--grad); }
+.wm-vstripe.alt { background:linear-gradient(135deg,#E0902B,#C2603C); }
+.wm-vcard .wm-acc { padding:16px 18px; }
+.wm-caret { width:26px; height:26px; border-radius:8px; background:#F1F5F7; display:flex; align-items:center; justify-content:center; color:var(--muted); font-size:11px; flex:none; }
 .wm-brickfoot { padding:0 18px 16px; }
-.wm-brickempty { background:#fff; border:2px dashed var(--line); border-radius:12px; padding:36px 20px;
-  text-align:center; color:var(--muted); font-size:13.5px; margin-top:18px; }
-@media (max-width:560px){ .wm-hero h2 { font-size:27px; } .wm-hero { box-shadow:6px 6px 0 rgba(14,140,127,.92); } }
+.wm-brickempty { background:#fff; border:1px dashed var(--line); border-radius:16px; padding:44px 20px; text-align:center; color:var(--muted); font-size:13.5px; margin-top:18px; box-shadow:var(--e1); }
+@media (max-width:560px){ .wm-hero { padding:26px 20px; } .wm-hero h2 { font-size:28px; } }
 .wm-drop { display:flex; align-items:center; justify-content:center; gap:8px; text-align:center; cursor:pointer; border:1.5px dashed var(--line); border-radius:12px; padding:16px; font-size:13px; color:var(--muted); background:#F8FAFB; transition:.15s; line-height:1.5; }
 .wm-drop:hover { border-color:var(--brand); color:var(--brand-dk); background:rgba(var(--brand-rgb),.05); }
 @media (max-width:560px){ .wm-slotrow { flex-wrap:wrap; } .wm-slotrow .wm-input { flex:1 1 40%; } }
@@ -501,11 +508,16 @@ export default function App() {
     body = (
       <Detail mtg={curMeeting} responses={data.responses.filter((r) => r.mtgId === curId)}
         mode={mode} hostPin={hostPin} flash={flash} askConfirm={setConfirm}
-        onBack={goHome} onRefresh={loadData}
+        onBack={goHome} onRefresh={loadData} onEdit={() => setView("edit")}
         onDeleted={async () => { setCurId(null); setView("home"); await loadData(); }} />
     );
   else if (view === "landing")
     body = <CodeEntry onEnter={openByCode} />;
+  else if (host && view === "edit" && curMeeting)
+    body = (
+      <Create initial={curMeeting} onCancel={() => setView("detail")} flash={flash}
+        onSaved={async (m) => { await apiSaveMeeting(m, hostPin); await loadData(); setCurId(m.id); setView("detail"); flash("수정했어요"); }} />
+    );
   else if (host && view === "create")
     body = (
       <Create onCancel={goHome} flash={flash}
@@ -615,31 +627,35 @@ function CodeEntry({ onEnter }) {
   const toggle = (id) => { setOpenId((cur) => (cur === id ? null : id)); setCode(""); };
   const submit = (id) => onEnter(code, id);
   return (
-    <div className="wm-brick">
+    <div>
       <div className="wm-hero">
+        <span className="wm-eyebrow">일정 조율 · 우모가</span>
         <h2>우모<b>가</b></h2>
         <div className="tag">우리가 모두 가능한 시간</div>
         <p>여러 사람의 가능한 시간을 모아 <b>모두가 되는 시간</b>을 찾아주는 도구예요. 주최자가 올린 후보 중 가능한 시간을 체크하고, <b>후보에 없으면 내가 가능한 시간을 직접 추가</b>할 수도 있어요. 가장 많이 겹치는 시간이 자동으로 정리되고, 확정된 일정은 <b>구글 캘린더에 등록할 수 있어요</b>.</p>
-        <p>아래 <b>진행 중인 모임</b>을 누르고, 주최자에게 받은 <b>참여 코드</b>를 입력하면 입장합니다. 받은 링크로도 바로 들어갈 수 있어요.</p>
+        <div className="wm-feats">
+          <span className="wm-feat"><span className="ic">🗓️</span> 시간 자동 취합</span>
+          <span className="wm-feat"><span className="ic">➕</span> 내 시간 추가</span>
+          <span className="wm-feat"><span className="ic">📅</span> 캘린더 등록</span>
+        </div>
       </div>
-      {active && active.length === 0 && (
-        <div className="wm-brickempty">지금 진행 중인 모임이 없어요.</div>
-      )}
+      {active && active.length === 0 && (<div className="wm-brickempty">지금 진행 중인 모임이 없어요.</div>)}
       {active && active.length > 0 && (
-        <div style={{ marginTop: 22 }}>
-          <span className="wm-bricklabel">현재 투표 중인 모임 · 눌러서 코드 입력</span>
+        <div style={{ marginTop: 24 }}>
+          <div className="wm-sectionlabel">현재 투표 중인 모임 · 눌러서 코드 입력</div>
           <div className="wm-bricklist">
             {active.map((m, i) => (
-              <div key={m.id} className={"wm-brickcard" + (i % 2 ? " alt" : "")}>
+              <div key={m.id} className="wm-vcard">
+                <div className={"wm-vstripe" + (i % 2 ? " alt" : "")} />
                 <button className="wm-acc" onClick={() => toggle(m.id)}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
                     <div className="wm-titlerow">
                       {m.type && <span className="wm-type">{TYPE_ICON[m.type] || ""} {m.type}</span>}
                       <h3 className="wm-mtitle">{m.title}</h3>
                     </div>
-                    <span style={{ color: "var(--faint)", fontSize: 12 }}>{openId === m.id ? "▲" : "▼"}</span>
+                    <span className="wm-caret">{openId === m.id ? "▲" : "▼"}</span>
                   </div>
-                  {m.deadline && <div className="wm-meta" style={{ marginTop: 7 }}><span className="wm-dl">⏳ {remainText(m.deadline)}</span></div>}
+                  {m.deadline && <div className="wm-meta" style={{ marginTop: 8 }}><span className="wm-dl">⏳ {remainText(m.deadline)}</span></div>}
                 </button>
                 {openId === m.id && (
                   <div className="wm-brickfoot">
@@ -706,15 +722,20 @@ function Home({ meetings, isAdmin, onAddHost, onOpen, onNew }) {
 }
 
 /* ───────────────────────── Create ───────────────────────── */
-function Create({ onCancel, onSaved, flash }) {
-  const [title, setTitle] = useState("");
-  const [type, setType] = useState("회의");
-  const [location, setLocation] = useState("");
-  const [desc, setDesc] = useState("");
-  const [dlDate, setDlDate] = useState("");
-  const [dlTime, setDlTime] = useState("");
-  const [expected, setExpected] = useState("");
-  const [slots, setSlots] = useState([{ id: uid("s"), date: "", time: "", durationMin: 60 }]);
+function Create({ onCancel, onSaved, flash, initial }) {
+  const ed = !!initial;
+  const [title, setTitle] = useState(initial ? initial.title || "" : "");
+  const [type, setType] = useState(initial ? initial.type || "회의" : "회의");
+  const [location, setLocation] = useState(initial ? initial.location || "" : "");
+  const [desc, setDesc] = useState(initial ? initial.desc || "" : "");
+  const [dlDate, setDlDate] = useState(initial && initial.deadline ? initial.deadline.split("T")[0] : "");
+  const [dlTime, setDlTime] = useState(initial && initial.deadline ? (initial.deadline.split("T")[1] || "") : "");
+  const [expected, setExpected] = useState(initial && initial.expected ? String(initial.expected) : "");
+  const [slots, setSlots] = useState(
+    initial && initial.slots && initial.slots.length
+      ? initial.slots.map((x) => ({ id: x.id, date: (x.start || "").split("T")[0] || "", time: (x.start || "").split("T")[1] || "", durationMin: x.durationMin || 60 }))
+      : [{ id: uid("s"), date: "", time: "", durationMin: 60 }]
+  );
   const [saving, setSaving] = useState(false);
   const [pasteText, setPasteText] = useState("");
   const [extractMsg, setExtractMsg] = useState("");
@@ -738,19 +759,23 @@ function Create({ onCancel, onSaved, flash }) {
     const built = slots.filter((s) => s.date && s.time)
       .map((s) => ({ id: s.id, start: `${s.date}T${s.time}`, durationMin: Number(s.durationMin) || 60 }))
       .sort((a, b) => new Date(a.start) - new Date(b.start));
-    await onSaved({
-      id: uid("m"), code: genCode(), title: title.trim(), type,
-      location: location.trim(), desc: desc.trim(),
+    const common = {
+      title: title.trim(), type, location: location.trim(), desc: desc.trim(),
       deadline: dlDate && dlTime ? `${dlDate}T${dlTime}` : null,
-      expected: expected ? Number(expected) : null,
-      slots: built, finalSlotId: null, createdAt: Date.now(),
-    });
+      expected: expected ? Number(expected) : null, slots: built,
+    };
+    if (ed) {
+      const fin = built.some((x) => x.id === initial.finalSlotId) ? initial.finalSlotId : null;
+      await onSaved({ ...initial, ...common, finalSlotId: fin });
+    } else {
+      await onSaved({ ...common, id: uid("m"), code: genCode(), finalSlotId: null, createdAt: Date.now() });
+    }
   };
 
   return (
     <div>
       <button className="wm-back" onClick={onCancel}>← 목록</button>
-      <h1 className="wm-h1">새 모임</h1>
+      <h1 className="wm-h1">{ed ? "모임 수정" : "새 모임"}</h1>
       <div className="wm-card" style={{ padding: "22px" }}>
         <div className="wm-field">
           <label className="wm-label">유형</label>
@@ -811,7 +836,7 @@ function Create({ onCancel, onSaved, flash }) {
         ))}
         <button className="wm-btn wm-ghost wm-sm" onClick={addSlot} style={{ marginTop: 4 }}>+ 시간 후보 추가</button>
         <div style={{ display: "flex", gap: 9, marginTop: 24 }}>
-          <button className="wm-btn wm-pri" disabled={!valid || saving} style={{ opacity: valid && !saving ? 1 : 0.45 }} onClick={save}>{saving ? "저장 중…" : "만들기"}</button>
+          <button className="wm-btn wm-pri" disabled={!valid || saving} style={{ opacity: valid && !saving ? 1 : 0.45 }} onClick={save}>{saving ? "저장 중…" : ed ? "저장" : "만들기"}</button>
           <button className="wm-btn wm-ghost" onClick={onCancel}>취소</button>
         </div>
       </div>
@@ -820,7 +845,7 @@ function Create({ onCancel, onSaved, flash }) {
 }
 
 /* ───────────────────────── Detail ───────────────────────── */
-function Detail({ mtg, responses, mode, hostPin, flash, askConfirm, onBack, onRefresh, onDeleted }) {
+function Detail({ mtg, responses, mode, hostPin, flash, askConfirm, onBack, onRefresh, onEdit, onDeleted }) {
   const [name, setName] = useState("");
   const [avail, setAvail] = useState({});
   const [note, setNote] = useState("");
@@ -903,7 +928,12 @@ function Detail({ mtg, responses, mode, hostPin, flash, askConfirm, onBack, onRe
           {mtg.type && <span className="wm-type">{TYPE_ICON[mtg.type] || ""} {mtg.type}</span>}
           <h1 className="wm-h1" style={{ margin: 0 }}>{mtg.title}</h1>
         </div>
-        {isHost && <button className="wm-btn wm-danger wm-sm" onClick={delMeeting} style={{ marginTop: 6, flex: "none" }}>모임 삭제</button>}
+        {isHost && (
+          <div style={{ display: "flex", gap: 8, marginTop: 6, flex: "none" }}>
+            <button className="wm-btn wm-ghost wm-sm" onClick={onEdit}>수정</button>
+            <button className="wm-btn wm-danger wm-sm" onClick={delMeeting}>모임 삭제</button>
+          </div>
+        )}
       </div>
       <div className="wm-info" style={{ marginTop: 12 }}>
         {mtg.location && <span>📍 {mtg.location}</span>}
