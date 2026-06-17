@@ -348,6 +348,9 @@ textarea.wm-input { resize:vertical; min-height:64px; }
 .wm-spin { width:22px; height:22px; border:2.5px solid var(--line); border-top-color:var(--brand); border-radius:50%; animation:wm-rot .7s linear infinite; margin:48px auto; }
 @keyframes wm-rot { to { transform:rotate(360deg); } }
 .wm-note { font-size:12px; color:var(--faint); background:#F4F6F9; border:1px solid var(--line); border-radius:10px; padding:11px 13px; line-height:1.55; margin-top:14px; }
+.wm-desc { background:linear-gradient(180deg,#F6FBFA,#FFFFFF); border:1px solid var(--line); border-left:3px solid var(--brand); border-radius:13px; padding:14px 16px; margin:0 0 16px; box-shadow:var(--e1); }
+.wm-desc-lab { display:inline-flex; align-items:center; gap:5px; font-size:11px; font-weight:700; letter-spacing:.05em; color:var(--brand-dk); text-transform:uppercase; margin-bottom:7px; }
+.wm-desc-body { font-size:14px; color:#2C3742; line-height:1.7; white-space:pre-wrap; }
 .wm-setup { padding:26px; margin-top:8px; }
 .wm-setup h2 { font-size:18px; margin:0 0 6px; letter-spacing:-.02em; }
 .wm-setup p { font-size:13px; color:var(--muted); margin:0 0 18px; line-height:1.6; }
@@ -954,6 +957,7 @@ function Detail({ mtg, responses, mode, hostPin, flash, askConfirm, onBack, onRe
         <div className="wm-titlerow" style={{ marginTop: 4 }}>
           {mtg.type && <TypeTag type={mtg.type} />}
           <h1 className="wm-h1" style={{ margin: 0 }}>{mtg.title}</h1>
+          <span className={"wm-badge " + statusOf(mtg).k}>{statusOf(mtg).t}</span>
         </div>
         {isHost && (
           <div style={{ display: "flex", gap: 8, marginTop: 6, flex: "none" }}>
@@ -968,7 +972,12 @@ function Detail({ mtg, responses, mode, hostPin, flash, askConfirm, onBack, onRe
         <span><Icon name="cal" size={13} /> 후보 {mtg.slots.length}개</span>
         {rt && <span className={"wm-dl" + (closed ? " over" : statusOf(mtg).k === "soon" ? " soon" : "")}><Icon name="clock" size={13} /> {rt}</span>}
       </div>
-      {mtg.desc && <div className="wm-note" style={{ marginTop: 0, marginBottom: 16 }}>{mtg.desc}</div>}
+      {mtg.desc && (
+        <div className="wm-desc">
+          <span className="wm-desc-lab"><Icon name="chat" size={13} /> 안내</span>
+          <div className="wm-desc-body">{mtg.desc}</div>
+        </div>
+      )}
 
       {isHost && (
         <div className="wm-share">
