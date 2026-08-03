@@ -202,211 +202,314 @@ function parseScheduleText(text, todayDate) {
   return out;
 }
 
+function useCountUp(target, dur = 750) {
+  const [v, setV] = useState(0);
+  useEffect(() => {
+    const n = Number(target) || 0;
+    if (typeof window === "undefined" || (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches)) { setV(n); return; }
+    let raf; const t0 = performance.now();
+    const step = (t) => {
+      const p = Math.min(1, (t - t0) / dur);
+      setV(Math.round(n * (1 - Math.pow(1 - p, 3))));
+      if (p < 1) raf = requestAnimationFrame(step);
+    };
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
+  }, [target, dur]);
+  return v;
+}
+
 /* ───────────────────────── styles ───────────────────────── */
 const CSS = `
 .wm * { box-sizing: border-box; }
 .wm {
-  --bg:#F2F5F8; --panel:#FFFFFF; --ink:#172029; --muted:#6A7886; --faint:#9AA7B4;
-  --line:#E2E8EE; --brand:#0E8C7F; --brand-dk:#0A6B61; --brand-rgb:14,140,127;
-  --amber:#D98A24; --bad:#C24B3A; --clay:#C2603C; --shadow:0 1px 2px rgba(23,32,41,.05),0 8px 24px rgba(23,32,41,.06);
-  --grad:linear-gradient(135deg,#13A697,#0B7065); --ring:0 0 0 3px rgba(14,140,127,.16); --e1:0 1px 2px rgba(23,32,41,.06),0 2px 6px rgba(23,32,41,.05); --e2:0 6px 16px rgba(23,32,41,.08),0 20px 44px rgba(23,32,41,.09);
+  --bg:#EEF2F5; --panel:#FFFFFF; --soft:#F3F6F8; --soft2:#EAF0F3;
+  --ink:#15202B; --muted:#5F6E7C; --faint:#93A1AE; --line:#E1E7EC;
+  --brand:#0E8C7F; --brand-dk:#0A6B61; --brand-rgb:14,140,127;
+  --amber:#D98A24; --bad:#C24B3A;
+  --grad:linear-gradient(135deg,#13A697,#0B7065);
+  --ring:0 0 0 3px rgba(var(--brand-rgb),.16);
+  --e1:0 1px 2px rgba(21,32,43,.05),0 2px 8px rgba(21,32,43,.05);
+  --e2:0 6px 18px rgba(21,32,43,.08),0 22px 48px rgba(21,32,43,.10);
   font-family:'Pretendard',-apple-system,BlinkMacSystemFont,'Apple SD Gothic Neo','Malgun Gothic','Segoe UI',sans-serif;
   color:var(--ink); background:var(--bg); min-height:100vh; line-height:1.5; -webkit-font-smoothing:antialiased;
 }
-.wm-wrap { max-width:840px; margin:0 auto; padding:0 18px 96px; }
-.wm-top { display:flex; align-items:flex-end; justify-content:space-between; gap:16px; padding:28px 2px 22px; }
-.wm-brand { display:flex; align-items:center; gap:10px; cursor:pointer; }
-.wm-logomark { width:30px; height:30px; border-radius:9px; background:var(--grad); color:#fff; display:flex; align-items:center; justify-content:center; box-shadow:0 4px 12px rgba(14,140,127,.32); }
-.wm-logo { font-size:25px; font-weight:800; letter-spacing:-.03em; color:var(--ink); }
+.wm[data-theme="dark"]{
+  --bg:#0E1417; --panel:#151C21; --soft:#1B242A; --soft2:#202B32;
+  --ink:#E9EFF3; --muted:#9AA9B5; --faint:#66757F; --line:#242F37;
+  --brand:#23B3A4; --brand-dk:#4FD2C2; --brand-rgb:35,179,164;
+  --grad:linear-gradient(135deg,#17A092,#0C7A6D);
+  --e1:0 1px 2px rgba(0,0,0,.32),0 2px 8px rgba(0,0,0,.26);
+  --e2:0 8px 22px rgba(0,0,0,.42),0 24px 52px rgba(0,0,0,.46);
+}
+.wm-wrap { max-width:1060px; margin:0 auto; padding:0 18px calc(64px + env(safe-area-inset-bottom)); }
+
+/* ── header ── */
+.wm-top { position:sticky; top:0; z-index:30; display:flex; align-items:center; justify-content:space-between; gap:14px;
+  margin:0 -18px 18px; padding:13px 20px; padding-top:calc(13px + env(safe-area-inset-top));
+  background:color-mix(in srgb, var(--bg) 82%, transparent);
+  backdrop-filter:blur(12px) saturate(1.3); -webkit-backdrop-filter:blur(12px) saturate(1.3);
+  border-bottom:1px solid color-mix(in srgb, var(--line) 62%, transparent); }
+.wm-brand { display:flex; align-items:center; gap:10px; cursor:pointer; min-width:0; }
+.wm-logomark { width:30px; height:30px; border-radius:9px; background:var(--grad); color:#fff; display:flex; align-items:center; justify-content:center; box-shadow:0 4px 12px rgba(var(--brand-rgb),.34); flex:none; }
+.wm-logo { font-size:23px; font-weight:800; letter-spacing:-.03em; color:var(--ink); white-space:nowrap; }
 .wm-logo b { color:var(--brand); }
-.wm-sub { font-size:12.5px; color:var(--muted); letter-spacing:-.01em; }
-.wm-headbtns { display:flex; gap:8px; align-items:center; }
-.wm-gear { background:none; border:none; cursor:pointer; font-size:18px; color:var(--muted); padding:6px; border-radius:8px; }
-.wm-gear:hover { background:#fff; }
-.wm-btn { border:none; border-radius:11px; font-family:inherit; font-weight:650; cursor:pointer;
-  font-size:14px; padding:11px 16px; transition:transform .08s ease, background .15s; letter-spacing:-.01em; }
+.wm-sub { font-size:12.5px; color:var(--muted); letter-spacing:-.01em; white-space:nowrap; }
+.wm-headbtns { display:flex; gap:8px; align-items:center; flex:none; }
+.wm-gear { background:none; border:none; cursor:pointer; font-size:16px; color:var(--muted); width:34px; height:34px; border-radius:9px; display:flex; align-items:center; justify-content:center; }
+.wm-gear:hover { background:var(--panel); color:var(--ink); }
+@media (max-width:640px){ .wm-sub { display:none; } }
+
+/* ── buttons ── */
+.wm-btn { border:none; border-radius:12px; font-family:inherit; font-weight:650; cursor:pointer;
+  font-size:14px; padding:11px 16px; transition:transform .08s ease, filter .15s, background .15s, border-color .15s; letter-spacing:-.01em; }
 .wm-btn:active { transform:translateY(1px); }
 .wm-btn:focus-visible { outline:2px solid var(--brand); outline-offset:2px; }
 .wm-btn:disabled { cursor:default; }
-.wm-pri { background:var(--grad); color:#fff; box-shadow:0 1px 2px rgba(10,107,97,.3), 0 6px 16px rgba(14,140,127,.26); }
-.wm-pri:hover { filter:brightness(1.05); box-shadow:0 2px 4px rgba(10,107,97,.32), 0 10px 22px rgba(14,140,127,.34); }
-.wm-ghost { background:#fff; color:var(--ink); border:1px solid var(--line); }
-.wm-ghost:hover { border-color:#C9D3DC; }
-.wm-danger { background:#fff; color:var(--bad); border:1px solid #EAD2CD; }
-.wm-danger:hover { background:#FDF4F2; }
-.wm-sm { font-size:12.5px; padding:7px 11px; border-radius:9px; }
+.wm-pri { background:var(--grad); color:#fff; box-shadow:0 1px 2px rgba(10,107,97,.3), 0 6px 16px rgba(var(--brand-rgb),.26); }
+.wm-pri:hover { filter:brightness(1.06); }
+.wm-ghost { background:var(--panel); color:var(--ink); border:1px solid var(--line); }
+.wm-ghost:hover { border-color:var(--faint); }
+.wm-danger { background:var(--panel); color:var(--bad); border:1px solid color-mix(in srgb, var(--bad) 28%, var(--line)); }
+.wm-danger:hover { background:color-mix(in srgb, var(--bad) 7%, var(--panel)); }
+.wm-sm { font-size:12.5px; padding:7px 11px; border-radius:10px; }
 
-.wm-card { background:var(--panel); border:1px solid var(--line); border-radius:16px; box-shadow:var(--e1); }
-.wm-list { display:flex; flex-direction:column; gap:12px; }
-.wm-mcard { padding:18px 20px; cursor:pointer; transition:border-color .15s, transform .08s; }
-.wm-mcard:hover { border-color:#CFE3DF; transform:translateY(-2px); box-shadow:var(--e2); }
-.wm-acc { width:100%; text-align:left; background:none; border:none; font-family:inherit; cursor:pointer; padding:0; color:inherit; }
-.wm-titlerow { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
-.wm-mtitle { font-size:17px; font-weight:750; letter-spacing:-.02em; margin:0; }
-.wm-type { display:inline-flex; align-items:center; gap:5px; font-size:11px; font-weight:700; padding:4px 9px; border-radius:8px; letter-spacing:-.01em; background:rgba(var(--brand-rgb),.1); color:var(--brand-dk); white-space:nowrap; }
-.wm-meta { font-size:12.5px; color:var(--muted); display:flex; gap:14px; flex-wrap:wrap; margin-top:9px; }
-.wm-meta span { display:inline-flex; align-items:center; gap:5px; }
-.wm-badge { font-size:11px; font-weight:700; padding:4px 9px; border-radius:999px; letter-spacing:-.01em; white-space:nowrap; }
-.wm-badge.collect { background:rgba(var(--brand-rgb),.1); color:var(--brand-dk); }
-.wm-badge.done { background:#172029; color:#fff; }
-.wm-badge.closed { background:#EEF0F3; color:var(--faint); }
-.wm-badge.soon { background:rgba(217,138,36,.14); color:var(--amber); }
+/* ── bento grid ── */
+.wm-bento { display:grid; grid-template-columns:repeat(12,1fr); gap:14px; }
+.wm-cell { background:var(--panel); border:1px solid var(--line); border-radius:20px; box-shadow:var(--e1); padding:22px; position:relative; overflow:hidden; min-width:0; }
+.c3 { grid-column:span 3; } .c4 { grid-column:span 4; } .c5 { grid-column:span 5; }
+.c6 { grid-column:span 6; } .c7 { grid-column:span 7; } .c8 { grid-column:span 8; } .c12 { grid-column:span 12; }
+@media (max-width:880px){ .c5,.c6,.c7,.c8 { grid-column:span 12; } .c4 { grid-column:span 12; } .c3 { grid-column:span 6; } }
+@keyframes wm-in { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:none; } }
+.wm-bento > * { animation:wm-in .55s cubic-bezier(.2,.7,.2,1) backwards; }
+.wm-bento > *:nth-child(1){animation-delay:.02s} .wm-bento > *:nth-child(2){animation-delay:.07s}
+.wm-bento > *:nth-child(3){animation-delay:.12s} .wm-bento > *:nth-child(4){animation-delay:.17s}
+.wm-bento > *:nth-child(5){animation-delay:.22s} .wm-bento > *:nth-child(6){animation-delay:.27s}
+.wm-bento > *:nth-child(7){animation-delay:.32s} .wm-bento > *:nth-child(8){animation-delay:.37s}
+.wm-bento > *:nth-child(n+9){animation-delay:.42s}
+.wm-cellhead { display:flex; align-items:center; gap:8px; font-size:13.5px; font-weight:750; letter-spacing:-.02em; margin:0 0 4px; }
+.wm-cellhead .ic { width:26px; height:26px; border-radius:9px; display:flex; align-items:center; justify-content:center; color:var(--brand-dk); background:rgba(var(--brand-rgb),.12); flex:none; }
+.wm-cellhint { font-size:12.5px; color:var(--muted); margin:0 0 16px; }
 
-.wm-join { display:flex; gap:8px; margin-bottom:14px; }
+/* ── hero ── */
+.wm-hero { padding:30px 30px 26px; background:
+  radial-gradient(520px 260px at 100% -14%, rgba(var(--brand-rgb),.12), transparent 62%), var(--panel); }
+.wm-eyebrow { display:inline-flex; align-items:center; gap:6px; font-size:11px; font-weight:750; letter-spacing:.08em; text-transform:uppercase;
+  color:var(--brand-dk); background:rgba(var(--brand-rgb),.1); padding:5px 11px; border-radius:999px; margin-bottom:14px; }
+.wm-hero h2 { font-size:31px; font-weight:850; letter-spacing:-.045em; margin:0; line-height:1.16; }
+.wm-hero h2 b { color:var(--brand); }
+.wm-hero .lead { font-size:14px; color:var(--muted); line-height:1.7; margin:12px 0 0; max-width:46ch; }
+.wm-hero .lead b { color:var(--brand-dk); font-weight:700; }
+@media (max-width:640px){ .wm-hero { padding:24px 20px 22px; } .wm-hero h2 { font-size:26px; } }
+
+/* ── hero demo: 겹침 시각화 ── */
+.wm-demo { position:relative; margin-top:26px; padding-top:8px; }
+.wm-demo .lane { display:flex; align-items:center; gap:10px; margin-bottom:9px; position:relative; z-index:1; }
+.wm-demo .who { font-size:11.5px; font-weight:700; color:var(--muted); width:34px; flex:none; text-align:right; }
+.wm-demo .tl { position:relative; flex:1; height:30px; border-radius:9px; background:var(--soft); }
+.wm-demo .bar { position:absolute; top:3px; bottom:3px; border-radius:7px;
+  background:rgba(var(--brand-rgb),.2); border:1px solid rgba(var(--brand-rgb),.34);
+  transform-origin:left center; animation:wm-bar .6s cubic-bezier(.2,.7,.2,1) backwards; }
+@keyframes wm-bar { from { transform:scaleX(0); } }
+.wm-demo .hit { position:absolute; top:2px; bottom:24px; border-radius:11px; z-index:2; pointer-events:none;
+  background:rgba(var(--brand-rgb),.13); border:1.5px solid rgba(var(--brand-rgb),.6);
+  box-shadow:0 6px 18px rgba(var(--brand-rgb),.2); animation:wm-hit .5s .95s cubic-bezier(.2,.7,.2,1) backwards; }
+@keyframes wm-hit { from { opacity:0; transform:scale(.9); } }
+.wm-demo .hitb { position:absolute; top:-12px; left:50%; transform:translateX(-50%); background:var(--grad); color:#fff;
+  font-size:10.5px; font-weight:800; padding:3px 10px; border-radius:999px; white-space:nowrap; box-shadow:0 4px 12px rgba(var(--brand-rgb),.4); }
+.wm-demo .ticks { display:flex; justify-content:space-between; padding-left:44px; font-size:10.5px; color:var(--faint); margin-top:4px; font-variant-numeric:tabular-nums; }
+
+/* ── 입장 셀 (다크 틸) ── */
+.wm-entrycell { background:linear-gradient(165deg,#0D4C45,#0A6B61 68%,#0E8C7F); border:none; color:#fff; display:flex; flex-direction:column; }
+.wm-entrycell::after { content:""; position:absolute; inset:0; pointer-events:none; opacity:.5;
+  background-image:radial-gradient(rgba(255,255,255,.13) 1px, transparent 1.5px); background-size:16px 16px;
+  -webkit-mask-image:linear-gradient(200deg,#000,transparent 65%); mask-image:linear-gradient(200deg,#000,transparent 65%); }
+.wm-entrycell > * { position:relative; z-index:1; }
+.wm-entrycell .lab { font-size:11px; font-weight:750; letter-spacing:.08em; text-transform:uppercase; color:#A9E8DE; }
+.wm-entrycell h3 { font-size:19px; font-weight:800; letter-spacing:-.03em; margin:6px 0 8px; color:#fff; }
+.wm-entrycell p { font-size:12.5px; color:#CBEDE7; line-height:1.65; margin:0 0 auto; padding-bottom:18px; }
+.wm-entrycell .wm-input { background:rgba(255,255,255,.12); border-color:rgba(255,255,255,.26); color:#fff;
+  text-transform:uppercase; letter-spacing:.16em; font-weight:750; text-align:center; font-size:16px; }
+.wm-entrycell .wm-input::placeholder { color:rgba(255,255,255,.45); letter-spacing:.06em; font-weight:600; }
+.wm-entrycell .wm-input:focus { border-color:#fff; box-shadow:0 0 0 3px rgba(255,255,255,.18); }
+.wm-entrycell .go { margin-top:10px; width:100%; background:#fff; color:#0A6B61; box-shadow:0 6px 18px rgba(0,0,0,.18); }
+.wm-entrycell .go:hover { filter:none; background:#EDF9F7; }
+.wm-entrycell .go:disabled { opacity:.55; }
+
+/* ── 기능 셀 ── */
+.wm-feat2 { display:flex; gap:13px; align-items:flex-start; padding:20px; }
+.wm-feat2 .ic { width:38px; height:38px; border-radius:12px; display:flex; align-items:center; justify-content:center; color:var(--brand-dk); background:rgba(var(--brand-rgb),.12); flex:none; }
+.wm-feat2 .t { font-size:14px; font-weight:750; letter-spacing:-.02em; }
+.wm-feat2 .d { font-size:12.5px; color:var(--muted); line-height:1.6; margin-top:3px; }
+@media (max-width:880px){ .wm-landing .wm-feat2 { grid-column:span 12; } }
+
+/* ── 랜딩 모임 목록 ── */
+.wm-mrows { display:flex; flex-direction:column; gap:9px; }
+.wm-mrow { border:1px solid var(--line); border-radius:14px; background:var(--panel); overflow:hidden; transition:border-color .15s, box-shadow .15s; }
+.wm-mrow:hover { border-color:color-mix(in srgb, var(--brand) 34%, var(--line)); box-shadow:var(--e1); }
+.wm-acc { width:100%; text-align:left; background:none; border:none; font-family:inherit; cursor:pointer; padding:14px 16px; color:inherit; }
+.wm-caret { width:26px; height:26px; border-radius:8px; background:var(--soft); display:flex; align-items:center; justify-content:center; color:var(--muted); font-size:11px; flex:none; }
+.wm-brickfoot { padding:0 16px 14px; }
+.wm-join { display:flex; gap:8px; }
 .wm-join .wm-input { flex:1; text-transform:uppercase; letter-spacing:.12em; font-weight:650; }
+.wm-brickempty { border:1px dashed var(--line); border-radius:14px; padding:34px 20px; text-align:center; color:var(--muted); font-size:13.5px; background:var(--soft); }
 
-.wm-empty { text-align:center; padding:64px 20px; color:var(--muted); }
-.wm-empty h3 { color:var(--ink); font-size:18px; margin:0 0 6px; letter-spacing:-.02em; }
-.wm-empty p { font-size:13.5px; margin:0 0 20px; }
+/* ── 대시보드 통계 ── */
+.wm-stat { padding:18px 20px; }
+.wm-stat .k { font-size:12px; font-weight:700; color:var(--muted); letter-spacing:-.01em; display:flex; align-items:center; gap:6px; }
+.wm-stat .k .dot { width:7px; height:7px; border-radius:50%; background:var(--brand); flex:none; }
+.wm-stat.amber .k .dot { background:var(--amber); }
+.wm-stat.ink .k .dot { background:var(--ink); }
+.wm-stat.plain .k .dot { background:var(--faint); }
+.wm-stat .v { font-size:31px; font-weight:800; letter-spacing:-.045em; margin-top:5px; font-variant-numeric:tabular-nums; line-height:1; }
+.wm-stat .u { font-size:13px; font-weight:650; color:var(--faint); margin-left:2px; }
+@media (max-width:880px){ .wm-stat { padding:15px 16px; } .wm-stat .v { font-size:26px; } }
 
+/* ── 모임 카드 (대시보드) ── */
+.wm-mcard2 { cursor:pointer; padding:0; transition:transform .14s ease, box-shadow .14s ease, border-color .14s ease; }
+.wm-mcard2:hover { transform:translateY(-2px); box-shadow:var(--e2); border-color:color-mix(in srgb, var(--brand) 30%, var(--line)); }
+.wm-stripe { height:3px; background:var(--grad); }
+.wm-stripe.soon { background:linear-gradient(90deg,#E0902B,#C2603C); }
+.wm-stripe.done { background:var(--ink); }
+.wm-stripe.closed { background:var(--line); }
+.wm-mcard2 .inner { padding:17px 19px; }
+.wm-titlerow { display:flex; align-items:center; gap:8px; flex-wrap:wrap; min-width:0; }
+.wm-mtitle { font-size:16.5px; font-weight:750; letter-spacing:-.02em; margin:0; }
+.wm-type { display:inline-flex; align-items:center; gap:5px; font-size:11px; font-weight:700; padding:4px 9px; border-radius:8px; letter-spacing:-.01em; background:rgba(var(--brand-rgb),.1); color:var(--brand-dk); white-space:nowrap; }
+.wm-meta { font-size:12.5px; color:var(--muted); display:flex; gap:13px; flex-wrap:wrap; margin-top:10px; }
+.wm-meta span { display:inline-flex; align-items:center; gap:5px; }
+.wm-badge { font-size:11px; font-weight:700; padding:4px 9px; border-radius:999px; letter-spacing:-.01em; white-space:nowrap; flex:none; }
+.wm-badge.collect { background:rgba(var(--brand-rgb),.1); color:var(--brand-dk); }
+.wm-badge.done { background:var(--ink); color:var(--bg); }
+.wm-badge.closed { background:var(--soft2); color:var(--faint); }
+.wm-badge.soon { background:rgba(217,138,36,.14); color:var(--amber); }
+.wm-empty { text-align:center; padding:56px 20px; }
+.wm-empty h3 { font-size:18px; margin:0 0 6px; letter-spacing:-.02em; }
+.wm-empty p { font-size:13.5px; margin:0 0 20px; color:var(--muted); }
+
+/* ── 폼 ── */
+.wm-card { background:var(--panel); border:1px solid var(--line); border-radius:20px; box-shadow:var(--e1); }
 .wm-field { margin-bottom:16px; }
 .wm-label { display:block; font-size:12.5px; font-weight:650; color:var(--muted); margin-bottom:7px; letter-spacing:-.01em; }
-.wm-input { width:100%; border:1px solid var(--line); border-radius:10px; padding:11px 13px;
-  font-size:14.5px; font-family:inherit; color:var(--ink); background:#fff; transition:border-color .15s; }
+.wm-input { width:100%; border:1px solid var(--line); border-radius:11px; padding:11px 13px;
+  font-size:14.5px; font-family:inherit; color:var(--ink); background:var(--panel); transition:border-color .15s, box-shadow .15s; }
 .wm-input:focus { outline:none; border-color:var(--brand); box-shadow:0 0 0 3px rgba(var(--brand-rgb),.12); }
+.wm-input::placeholder { color:var(--faint); }
 textarea.wm-input { resize:vertical; min-height:64px; }
-
 .wm-seg { display:flex; gap:8px; flex-wrap:wrap; }
-.wm-segb { border:1.5px solid var(--line); background:#fff; border-radius:10px; padding:9px 13px; cursor:pointer;
+.wm-segb { border:1.5px solid var(--line); background:var(--panel); border-radius:11px; padding:9px 13px; cursor:pointer;
   font-family:inherit; font-size:13.5px; font-weight:600; color:var(--muted); transition:.12s; display:inline-flex; gap:6px; align-items:center; }
-.wm-segb:hover { border-color:#C7D3DC; }
-.wm-segb.on { border-color:var(--brand); background:rgba(var(--brand-rgb),.07); color:var(--brand-dk); }
-
+.wm-segb:hover { border-color:var(--faint); }
+.wm-segb.on { border-color:var(--brand); background:rgba(var(--brand-rgb),.08); color:var(--brand-dk); }
 .wm-slotrow { display:flex; gap:8px; align-items:center; margin-bottom:8px; }
 .wm-slotrow .wm-input { padding:9px 11px; font-size:13.5px; }
-.wm-x { border:none; background:#F1F4F7; color:var(--muted); width:36px; height:38px; border-radius:9px; cursor:pointer; font-size:18px; flex:none; transition:background .15s; }
-.wm-x:hover { background:#E7EBEF; color:var(--bad); }
+.wm-x { border:none; background:var(--soft); color:var(--muted); width:36px; height:38px; border-radius:10px; cursor:pointer; font-size:18px; flex:none; transition:background .15s, color .15s; }
+.wm-x:hover { background:var(--soft2); color:var(--bad); }
+.wm-drop { display:flex; align-items:center; justify-content:center; gap:8px; text-align:center; cursor:pointer; border:1.5px dashed var(--line); border-radius:12px; padding:16px; font-size:13px; color:var(--muted); background:var(--soft); transition:.15s; line-height:1.5; }
+.wm-drop:hover { border-color:var(--brand); color:var(--brand-dk); }
+@media (max-width:560px){ .wm-slotrow { flex-wrap:wrap; } .wm-slotrow .wm-input { flex:1 1 40%; } }
 
-.wm-sec { padding:20px 22px; }
-.wm-sec h2 { font-size:14px; font-weight:750; letter-spacing:-.02em; margin:0 0 2px; position:relative; padding-left:13px; }
+/* ── 상세 ── */
+.wm-back { background:none; border:none; color:var(--muted); font-family:inherit; font-size:13.5px; cursor:pointer; padding:6px 0; margin:2px 0 2px; display:inline-flex; align-items:center; gap:5px; }
+.wm-back:hover { color:var(--ink); }
+.wm-h1 { font-size:22px; font-weight:800; letter-spacing:-.03em; margin:4px 0 4px; }
+.wm-info { font-size:13px; color:var(--muted); margin:0 0 16px; display:flex; gap:14px; flex-wrap:wrap; align-items:center; }
+.wm-info span { display:inline-flex; align-items:center; gap:5px; }
+.wm-dl { font-size:12.5px; font-weight:650; }
+.wm-dl.soon { color:var(--amber); }
+.wm-dl.over { color:var(--bad); }
+.wm-desc { background:linear-gradient(180deg, rgba(var(--brand-rgb),.05), transparent 80%), var(--panel);
+  border:1px solid var(--line); border-left:3px solid var(--brand); border-radius:14px; padding:14px 16px; margin:0 0 14px; box-shadow:var(--e1); }
+.wm-desc-lab { display:inline-flex; align-items:center; gap:5px; font-size:11px; font-weight:700; letter-spacing:.05em; color:var(--brand-dk); text-transform:uppercase; margin-bottom:7px; }
+.wm-desc-body { font-size:14px; color:var(--ink); line-height:1.7; white-space:pre-wrap; }
+.wm-lockmsg { background:color-mix(in srgb, var(--amber) 9%, var(--panel)); border:1px solid color-mix(in srgb, var(--amber) 28%, var(--line)); color:var(--amber); border-radius:11px; padding:11px 13px; font-size:12.5px; font-weight:600; }
+.wm-note { font-size:12px; color:var(--faint); background:var(--soft); border:1px solid var(--line); border-radius:11px; padding:11px 13px; line-height:1.55; margin-top:14px; }
+
+/* 확정 셀 */
+.wm-confirmcell { background:linear-gradient(135deg,#0E8C7F,#0A6B61); border:none; color:#fff; }
+.wm-confirmcell .lab { font-size:11px; font-weight:750; color:#CFF6EE; letter-spacing:.08em; text-transform:uppercase; }
+.wm-confirmcell .big { font-size:19px; font-weight:800; letter-spacing:-.025em; margin:3px 0 13px; }
+.wm-confirmcell .row { display:flex; gap:9px; flex-wrap:wrap; }
+.wm-gcal { background:#fff; color:#15202B; text-decoration:none; display:inline-flex; align-items:center; gap:7px; font-weight:650; font-size:13.5px; padding:9px 14px; border-radius:11px; border:none; font-family:inherit; cursor:pointer; }
+.wm-gcal:hover { background:#EDF9F7; }
+
+/* 공유 셀 */
+.wm-share2 { display:flex; gap:18px; align-items:stretch; flex-wrap:wrap; }
+.wm-share2 .codebox { flex:none; display:flex; flex-direction:column; justify-content:center; background:var(--soft); border:1px dashed var(--line); border-radius:14px; padding:12px 20px; min-width:150px; }
+.wm-share2 .codetag { font-size:11px; font-weight:700; color:var(--muted); letter-spacing:.02em; }
+.wm-share2 .wm-code { font-size:25px; font-weight:800; letter-spacing:.14em; color:var(--brand-dk); font-family:'SFMono-Regular',ui-monospace,Menlo,monospace; margin-top:2px; }
+.wm-share2 .linkcol { flex:1; min-width:240px; display:flex; flex-direction:column; justify-content:center; gap:9px; }
+.wm-linkrow { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+.wm-linkrow .wm-input { flex:1 1 200px; font-size:12.5px; padding:9px 11px; color:var(--muted); }
+
+/* 응답 / 결과 섹션 */
+.wm-sec h2 { font-size:14.5px; font-weight:750; letter-spacing:-.02em; margin:0 0 2px; position:relative; padding-left:13px; }
 .wm-sec h2::before { content:""; position:absolute; left:0; top:2px; bottom:2px; width:4px; border-radius:3px; background:var(--grad); }
 .wm-sec .hint { font-size:12.5px; color:var(--muted); margin:0 0 16px; }
-
 .wm-chips { display:flex; flex-direction:column; gap:8px; }
 .wm-chip { display:flex; align-items:center; gap:11px; width:100%; text-align:left; cursor:pointer;
-  border:1.5px solid var(--line); background:#fff; border-radius:12px; padding:12px 14px; font-family:inherit; transition:.14s; box-shadow:var(--e1); }
-.wm-chip:hover { border-color:#CFE3DF; transform:translateY(-1px); }
-.wm-chip.on { border-color:var(--brand); background:linear-gradient(0deg, rgba(14,140,127,.08), rgba(14,140,127,.03)); }
+  border:1.5px solid var(--line); background:var(--panel); border-radius:13px; padding:12px 14px; font-family:inherit; color:inherit; transition:.14s; box-shadow:var(--e1); }
+.wm-chip:hover { border-color:color-mix(in srgb, var(--brand) 34%, var(--line)); transform:translateY(-1px); }
+.wm-chip.on { border-color:var(--brand); background:linear-gradient(0deg, rgba(var(--brand-rgb),.09), rgba(var(--brand-rgb),.03)); }
 .wm-chip:disabled { cursor:default; opacity:.55; }
-.wm-chip:disabled:hover { border-color:var(--line); }
-.wm-tick { width:20px; height:20px; border-radius:6px; border:1.5px solid var(--faint); flex:none; display:flex; align-items:center; justify-content:center; color:#fff; transition:.12s; }
-.wm-chip.on .wm-tick { background:var(--brand); border-color:var(--brand); }
+.wm-chip:disabled:hover { border-color:var(--line); transform:none; }
+.wm-tick { width:20px; height:20px; border-radius:7px; border:1.5px solid var(--faint); flex:none; display:flex; align-items:center; justify-content:center; color:#fff; transition:.12s; }
+.wm-chip.on .wm-tick { background:var(--brand); border-color:var(--brand); animation:wm-pop2 .22s ease; }
+@keyframes wm-pop2 { 50% { transform:scale(1.22); } }
 .wm-chip .when { font-size:14px; font-weight:600; letter-spacing:-.01em; }
 .wm-chip .dur { font-size:12px; color:var(--muted); margin-left:auto; }
 
 .wm-rank { display:flex; flex-direction:column; gap:10px; }
-.wm-slot { border:1px solid var(--line); border-radius:14px; padding:14px 16px; position:relative; overflow:hidden; box-shadow:var(--e1); transition:transform .14s, box-shadow .14s; }
+.wm-slot { border:1px solid var(--line); border-radius:15px; padding:14px 16px; position:relative; overflow:hidden; box-shadow:var(--e1); transition:transform .14s, box-shadow .14s; }
 .wm-slot:hover { transform:translateY(-1px); box-shadow:var(--e2); }
-.wm-slot .fill { position:absolute; inset:0; right:auto; background:linear-gradient(90deg, rgba(14,140,127,.18), rgba(14,140,127,.06)); z-index:0; transition:width .55s cubic-bezier(.2,.7,.2,1); }
+.wm-slot .fill { position:absolute; inset:0; right:auto; background:linear-gradient(90deg, rgba(var(--brand-rgb),.18), rgba(var(--brand-rgb),.05)); z-index:0; transition:width .55s cubic-bezier(.2,.7,.2,1); }
 .wm-slot.all { border-color:var(--brand); box-shadow:var(--ring), var(--e1); }
-.wm-slot.final { border-color:var(--ink); box-shadow:0 0 0 3px rgba(23,32,41,.1), var(--e1); }
+.wm-slot.final { border-color:var(--ink); box-shadow:0 0 0 3px color-mix(in srgb, var(--ink) 12%, transparent), var(--e1); }
 .wm-slot > * { position:relative; z-index:1; }
 .wm-slothead { display:flex; align-items:center; gap:11px; }
-.wm-no { width:26px; height:26px; border-radius:50%; background:#ECF1F4; color:var(--muted); font-size:12px; font-weight:800; display:flex; align-items:center; justify-content:center; flex:none; }
+.wm-no { width:26px; height:26px; border-radius:50%; background:var(--soft2); color:var(--muted); font-size:12px; font-weight:800; display:flex; align-items:center; justify-content:center; flex:none; }
 .wm-slot.all .wm-no { background:var(--grad); color:#fff; }
 .wm-when2 { font-size:14.5px; font-weight:700; letter-spacing:-.02em; }
 .wm-time2 { font-size:12px; color:var(--muted); }
-.wm-count { margin-left:auto; font-size:12.5px; font-weight:800; color:var(--brand-dk); white-space:nowrap; background:rgba(14,140,127,.1); padding:3px 9px; border-radius:999px; }
+.wm-count { margin-left:auto; font-size:12.5px; font-weight:800; color:var(--brand-dk); white-space:nowrap; background:rgba(var(--brand-rgb),.1); padding:3px 9px; border-radius:999px; font-variant-numeric:tabular-nums; }
 .wm-allbadge { margin-left:8px; font-size:10.5px; font-weight:800; color:#fff; background:var(--grad); padding:3px 8px; border-radius:999px; }
 .wm-people { margin-top:9px; display:flex; flex-wrap:wrap; gap:5px; }
 .wm-p { font-size:11.5px; padding:3px 8px; border-radius:7px; font-weight:600; }
 .wm-p.yes { background:rgba(var(--brand-rgb),.14); color:var(--brand-dk); }
-.wm-p.no { background:#F0F2F5; color:var(--faint); text-decoration:line-through; }
+.wm-p.no { background:var(--soft2); color:var(--faint); text-decoration:line-through; }
 .wm-pick { margin-top:11px; }
 
-.wm-confirmbar { background:linear-gradient(135deg,#0E8C7F,#0A6B61); color:#fff; border-radius:16px; padding:18px 20px; margin-bottom:16px; box-shadow:0 10px 30px rgba(14,140,127,.3); }
-.wm-confirmbar .lab { font-size:11px; font-weight:700; color:#CFF6EE; letter-spacing:.08em; text-transform:uppercase; }
-.wm-confirmbar .big { font-size:18px; font-weight:750; letter-spacing:-.02em; margin:3px 0 13px; }
-.wm-confirmbar .row { display:flex; gap:9px; flex-wrap:wrap; }
-.wm-gcal { background:#fff; color:#172029; text-decoration:none; display:inline-flex; align-items:center; gap:7px; font-weight:650; font-size:13.5px; padding:9px 14px; border-radius:10px; border:none; font-family:inherit; cursor:pointer; }
-.wm-gcal:hover { background:#EFF2F5; }
-
-.wm-share { border:1px dashed var(--line); border-radius:13px; padding:14px 16px; margin-bottom:16px; background:#F8FAFB; }
-.wm-share .codetag { font-size:11px; font-weight:700; color:var(--muted); letter-spacing:.02em; }
-.wm-code { font-size:24px; font-weight:800; letter-spacing:.14em; color:var(--brand-dk); margin:2px 0 10px; font-family:'SFMono-Regular',ui-monospace,Menlo,monospace; }
-.wm-invite { width:100%; border:1px solid var(--line); border-radius:9px; padding:9px 11px; font-size:12.5px; font-family:inherit; color:var(--muted); background:#fff; resize:none; line-height:1.5; }
-.wm-linkrow { display:flex; gap:8px; align-items:center; }
-.wm-linkrow .wm-input { flex:1; font-size:12.5px; padding:9px 11px; }
-.wm-dl { font-size:12.5px; font-weight:650; }
-.wm-dl.soon { color:var(--amber); }
-.wm-dl.over { color:var(--bad); }
-.wm-lockmsg { background:#FBF3EC; border:1px solid #F0DFCB; color:var(--amber); border-radius:10px; padding:11px 13px; font-size:12.5px; font-weight:600; }
-.wm-err { background:#FDF4F2; border:1px solid #EAD2CD; color:var(--bad); border-radius:10px; padding:11px 13px; font-size:12.5px; font-weight:600; margin-bottom:14px; }
-
-.wm-toast { position:fixed; left:50%; bottom:26px; transform:translateX(-50%); background:#172029; color:#fff; padding:11px 18px; border-radius:11px; font-size:13.5px; font-weight:600; z-index:50; box-shadow:0 8px 28px rgba(0,0,0,.25); animation:wm-up .25s ease; }
-@keyframes wm-up { from{opacity:0; transform:translate(-50%,8px);} to{opacity:1;transform:translate(-50%,0);} }
-.wm-modal { position:fixed; inset:0; background:rgba(23,32,41,.45); z-index:60; display:flex; align-items:center; justify-content:center; padding:20px; }
-.wm-mbox { background:#fff; border-radius:16px; padding:24px; max-width:380px; width:100%; box-shadow:0 20px 60px rgba(0,0,0,.3); }
+/* ── 팝오버·모달·토스트 ── */
+.wm-menuwrap { position:relative; }
+.wm-adminbtn { background:none; border:1px solid var(--line); color:var(--muted); border-radius:10px; font-family:inherit; font-size:12.5px; font-weight:600; padding:7px 12px; cursor:pointer; }
+.wm-adminbtn:hover { color:var(--ink); border-color:var(--faint); }
+.wm-pop { position:absolute; right:0; top:calc(100% + 8px); background:var(--panel); border:1px solid var(--line); border-radius:13px; box-shadow:var(--e2); padding:12px; min-width:236px; z-index:40; display:flex; flex-direction:column; gap:9px; }
+.wm-pop .wm-input { text-transform:none; letter-spacing:normal; }
+.wm-popitem { background:none; border:none; text-align:left; font-family:inherit; font-size:13.5px; color:var(--ink); padding:10px 11px; border-radius:9px; cursor:pointer; }
+.wm-popitem:hover { background:var(--soft); }
+.wm-backdrop { position:fixed; inset:0; z-index:39; }
+.wm-toast { position:fixed; left:50%; bottom:calc(26px + env(safe-area-inset-bottom)); transform:translateX(-50%); background:var(--ink); color:var(--bg); padding:11px 18px; border-radius:12px; font-size:13.5px; font-weight:600; z-index:50; box-shadow:0 8px 28px rgba(0,0,0,.28); animation:wm-up .25s ease; }
+@keyframes wm-up { from { opacity:0; transform:translate(-50%,8px); } to { opacity:1; transform:translate(-50%,0); } }
+.wm-modal { position:fixed; inset:0; background:rgba(10,16,20,.5); z-index:60; display:flex; align-items:center; justify-content:center; padding:20px; }
+.wm-mbox { background:var(--panel); border-radius:18px; padding:24px; max-width:380px; width:100%; box-shadow:0 20px 60px rgba(0,0,0,.35); animation:wm-in .25s ease; }
 .wm-mbox h3 { margin:0 0 6px; font-size:16px; letter-spacing:-.02em; }
 .wm-mbox p { margin:0 0 16px; font-size:13.5px; color:var(--muted); line-height:1.55; }
 .wm-mbox .row { display:flex; gap:9px; justify-content:flex-end; margin-top:18px; }
-.wm-back { background:none; border:none; color:var(--muted); font-family:inherit; font-size:13.5px; cursor:pointer; padding:6px 0; margin:6px 0 2px; display:inline-flex; align-items:center; gap:5px; }
-.wm-back:hover { color:var(--ink); }
-.wm-h1 { font-size:22px; font-weight:800; letter-spacing:-.03em; margin:4px 0 4px; }
-.wm-info { font-size:13px; color:var(--muted); margin:0 0 18px; display:flex; gap:14px; flex-wrap:wrap; align-items:center; }
-.wm-info span { display:inline-flex; align-items:center; gap:5px; }
+.wm-err { background:color-mix(in srgb, var(--bad) 7%, var(--panel)); border:1px solid color-mix(in srgb, var(--bad) 26%, var(--line)); color:var(--bad); border-radius:11px; padding:11px 13px; font-size:12.5px; font-weight:600; margin-bottom:14px; }
 .wm-spin { width:22px; height:22px; border:2.5px solid var(--line); border-top-color:var(--brand); border-radius:50%; animation:wm-rot .7s linear infinite; margin:48px auto; }
 @keyframes wm-rot { to { transform:rotate(360deg); } }
-.wm-note { font-size:12px; color:var(--faint); background:#F4F6F9; border:1px solid var(--line); border-radius:10px; padding:11px 13px; line-height:1.55; margin-top:14px; }
-.wm-desc { background:linear-gradient(180deg,#F6FBFA,#FFFFFF); border:1px solid var(--line); border-left:3px solid var(--brand); border-radius:13px; padding:14px 16px; margin:0 0 16px; box-shadow:var(--e1); }
-.wm-desc-lab { display:inline-flex; align-items:center; gap:5px; font-size:11px; font-weight:700; letter-spacing:.05em; color:var(--brand-dk); text-transform:uppercase; margin-bottom:7px; }
-.wm-desc-body { font-size:14px; color:#2C3742; line-height:1.7; white-space:pre-wrap; }
+
+/* ── 셋업·기타 ── */
 .wm-setup { padding:26px; margin-top:8px; }
 .wm-setup h2 { font-size:18px; margin:0 0 6px; letter-spacing:-.02em; }
 .wm-setup p { font-size:13px; color:var(--muted); margin:0 0 18px; line-height:1.6; }
-.wm-steps { font-size:12.5px; color:var(--muted); line-height:1.7; background:#F4F6F9; border:1px solid var(--line); border-radius:10px; padding:13px 15px; margin-top:14px; }
-.wm-entry { padding:30px 26px; margin-top:8px; }
-.wm-entry h2 { font-size:19px; margin:0 0 6px; letter-spacing:-.02em; }
-.wm-entry p { font-size:13px; color:var(--muted); margin:0 0 18px; line-height:1.6; }
-.wm-linktiny { background:none; border:none; color:var(--brand-dk); font-family:inherit; font-size:13px; cursor:pointer; padding:10px 0 0; text-decoration:underline; }
+.wm-steps { font-size:12.5px; color:var(--muted); line-height:1.7; background:var(--soft); border:1px solid var(--line); border-radius:11px; padding:13px 15px; margin-top:14px; }
 .wm-logout { background:none; border:1px solid var(--line); color:var(--muted); border-radius:9px; font-family:inherit; font-size:12.5px; padding:7px 11px; cursor:pointer; }
 .wm-logout:hover { color:var(--ink); }
-.wm-menuwrap { position:relative; }
-.wm-adminbtn { background:none; border:1px solid var(--line); color:var(--muted); border-radius:9px; font-family:inherit; font-size:12.5px; font-weight:600; padding:7px 12px; cursor:pointer; }
-.wm-adminbtn:hover { color:var(--ink); border-color:#C9D3DC; }
-.wm-pop { position:absolute; right:0; top:calc(100% + 8px); background:#fff; border:1px solid var(--line); border-radius:12px; box-shadow:0 10px 30px rgba(23,32,41,.16); padding:12px; min-width:236px; z-index:40; display:flex; flex-direction:column; gap:9px; }
-.wm-pop .wm-input { text-transform:none; letter-spacing:normal; }
-.wm-popitem { background:none; border:none; text-align:left; font-family:inherit; font-size:13.5px; color:var(--ink); padding:10px 11px; border-radius:9px; cursor:pointer; }
-.wm-popitem:hover { background:#F1F4F7; }
-.wm-backdrop { position:fixed; inset:0; z-index:39; }
-.wm-footer { text-align:center; font-size:12px; color:var(--faint); margin-top:36px; }
-/* ── landing (SaaS) ── */
-.wm-hero { position:relative; overflow:hidden; border-radius:20px; padding:34px 30px;
-  background:linear-gradient(180deg,#FFFFFF,#F6FBFA); border:1px solid var(--line); box-shadow:var(--e2); }
-.wm-hero::before { content:""; position:absolute; inset:0; pointer-events:none;
-  background:radial-gradient(440px 220px at 100% -12%, rgba(14,140,127,.13), transparent 62%); }
-.wm-hero::after { content:""; position:absolute; inset:0; pointer-events:none; opacity:.6;
-  background-image:radial-gradient(rgba(23,32,41,.06) 1px, transparent 1.5px); background-size:18px 18px;
-  -webkit-mask-image:linear-gradient(180deg,#000,transparent 72%); mask-image:linear-gradient(180deg,#000,transparent 72%); }
-.wm-hero > * { position:relative; z-index:1; }
-.wm-eyebrow { display:inline-block; font-size:11px; font-weight:700; letter-spacing:.08em; text-transform:uppercase;
-  color:var(--brand-dk); background:rgba(14,140,127,.1); padding:5px 11px; border-radius:999px; margin-bottom:15px; }
-.wm-hero h2 { font-size:34px; font-weight:850; letter-spacing:-.045em; margin:0; color:var(--ink); line-height:1.05; }
-.wm-hero h2 b { color:var(--brand); }
-.wm-hero .tag { font-size:14px; color:var(--muted); font-weight:600; margin-top:8px; }
-.wm-hero p { font-size:13.5px; color:#46535F; line-height:1.72; margin:16px 0 0; max-width:56ch; }
-.wm-hero p b { color:var(--brand-dk); font-weight:700; }
-.wm-feats { display:flex; flex-wrap:wrap; gap:9px; margin-top:22px; }
-.wm-feat { display:inline-flex; align-items:center; gap:8px; font-size:12.5px; font-weight:650; color:var(--ink);
-  background:#fff; border:1px solid var(--line); border-radius:12px; padding:8px 13px 8px 9px; box-shadow:var(--e1); }
-.wm-feat .ic { width:24px; height:24px; border-radius:8px; display:flex; align-items:center; justify-content:center; color:var(--brand-dk); background:rgba(14,140,127,.12); }
-.wm-sectionlabel { display:flex; align-items:center; gap:10px; font-size:12px; font-weight:700; color:var(--muted); letter-spacing:-.01em; margin:0 2px 15px; }
-.wm-sectionlabel::after { content:""; flex:1; height:1px; background:linear-gradient(90deg, var(--line), transparent); }
-.wm-bricklist { display:flex; flex-direction:column; gap:14px; }
-.wm-vcard { background:#fff; border:1px solid var(--line); border-radius:16px; box-shadow:var(--e1); overflow:hidden;
-  transition:transform .14s ease, box-shadow .14s ease, border-color .14s ease; }
-.wm-vcard:hover { transform:translateY(-2px); box-shadow:var(--e2); border-color:#CFE3DF; }
-.wm-vstripe { height:3px; background:var(--grad); }
-.wm-vstripe.alt { background:linear-gradient(135deg,#E0902B,#C2603C); }
-.wm-vcard .wm-acc { padding:16px 18px; }
-.wm-caret { width:26px; height:26px; border-radius:8px; background:#F1F5F7; display:flex; align-items:center; justify-content:center; color:var(--muted); font-size:11px; flex:none; }
-.wm-brickfoot { padding:0 18px 16px; }
-.wm-brickempty { background:#fff; border:1px dashed var(--line); border-radius:16px; padding:44px 20px; text-align:center; color:var(--muted); font-size:13.5px; margin-top:18px; box-shadow:var(--e1); }
-@media (max-width:560px){ .wm-hero { padding:26px 20px; } .wm-hero h2 { font-size:28px; } }
-.wm-drop { display:flex; align-items:center; justify-content:center; gap:8px; text-align:center; cursor:pointer; border:1.5px dashed var(--line); border-radius:12px; padding:16px; font-size:13px; color:var(--muted); background:#F8FAFB; transition:.15s; line-height:1.5; }
-.wm-drop:hover { border-color:var(--brand); color:var(--brand-dk); background:rgba(var(--brand-rgb),.05); }
-@media (max-width:560px){ .wm-slotrow { flex-wrap:wrap; } .wm-slotrow .wm-input { flex:1 1 40%; } }
-@media (prefers-reduced-motion:reduce){ .wm *{animation:none!important; transition:none!important;} }
+.wm-footer { text-align:center; margin-top:44px; color:var(--faint); }
+.wm-footer .fb { display:inline-flex; align-items:center; gap:7px; font-size:13px; font-weight:750; color:var(--muted); letter-spacing:-.02em; }
+.wm-footer .fs { font-size:12px; margin-top:5px; }
+@media (prefers-reduced-motion:reduce){ .wm *, .wm *::before, .wm *::after { animation:none!important; transition:none!important; } }
 `;
 
 /* ───────────────────────── App ───────────────────────── */
@@ -426,6 +529,15 @@ export default function App() {
   const [toast, setToast] = useState("");
   const [confirm, setConfirm] = useState(null);
   const [showSetup, setShowSetup] = useState(false);
+  const [theme, setTheme] = useState(() => {
+    const saved = lsGet("umoga:theme");
+    if (saved === "dark" || saved === "light") return saved;
+    return typeof window !== "undefined" && window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  });
+  const toggleTheme = () => setTheme((t) => { const n = t === "dark" ? "light" : "dark"; lsSet("umoga:theme", n); return n; });
+  useEffect(() => {
+    try { document.querySelector('meta[name="theme-color"]')?.setAttribute("content", theme === "dark" ? "#0E1417" : "#0E8C7F"); } catch {}
+  }, [theme]);
   const toastTimer = useRef(null);
 
   const flash = (m) => { setToast(m); clearTimeout(toastTimer.current); toastTimer.current = setTimeout(() => setToast(""), 2200); };
@@ -525,9 +637,9 @@ export default function App() {
     else { setGuestCode(null); setData({ meetings: [], responses: [] }); }
   };
 
-  if (gasUrl === undefined) return (<div className="wm"><style>{CSS}</style><div className="wm-spin" /></div>);
+  if (gasUrl === undefined) return (<div className="wm" data-theme={theme}><style>{CSS}</style><div className="wm-spin" /></div>);
   if (gasUrl === "" || showSetup)
-    return (<div className="wm"><style>{CSS}</style><div className="wm-wrap"><Setup onSave={saveUrl} current={gasUrl} onClose={gasUrl ? () => setShowSetup(false) : null} /></div></div>);
+    return (<div className="wm" data-theme={theme}><style>{CSS}</style><div className="wm-wrap"><Setup onSave={saveUrl} current={gasUrl} onClose={gasUrl ? () => setShowSetup(false) : null} /></div></div>);
 
   const curMeeting = data && curId ? data.meetings.find((m) => m.id === curId) : null;
 
@@ -553,14 +665,14 @@ export default function App() {
         onSaved={async (m) => { await apiSaveMeeting(m, hostPin); await loadData(); setCurId(m.id); setMode("host"); setView("detail"); flash("모임을 만들었어요"); }} />
     );
   else if (host)
-    body = <Home meetings={data.meetings} isAdmin={isAdmin}
+    body = <Home meetings={data.meetings} responses={data.responses} isAdmin={isAdmin}
       onAddHost={async (name, pin) => { await apiAddHost(name, pin, hostPin); flash(name + " 님에게 권한을 줬어요"); }}
       onOpen={(id) => { setMode("host"); setCurId(id); setView("detail"); }} onNew={() => setView("create")} />;
   else
     body = <CodeEntry onEnter={openByCode} />;
 
   return (
-    <div className="wm">
+    <div className="wm" data-theme={theme}>
       <style>{CSS}</style>
       {(loginOpen || menuOpen) && <div className="wm-backdrop" onClick={() => { setLoginOpen(false); setMenuOpen(false); }} />}
       <div className="wm-wrap">
@@ -571,6 +683,7 @@ export default function App() {
             <span className="wm-sub">우리가 모두 가능한 시간</span>
           </div>
           <div className="wm-headbtns">
+            <button className="wm-gear" title={theme === "dark" ? "라이트 모드" : "다크 모드"} onClick={toggleTheme} aria-label="테마 전환">{theme === "dark" ? "☀" : "☾"}</button>
             {host && view === "home" && <button className="wm-btn wm-pri" onClick={() => setView("create")}>+ 새 모임</button>}
             {host && (view === "home" || view === "landing") && (
               view === "landing"
@@ -604,7 +717,10 @@ export default function App() {
           </div>
         </div>
         {body}
-        <div className="wm-footer">만든이 @carpediemkosuk</div>
+        <div className="wm-footer">
+          <div className="fb"><span className="wm-logomark" style={{ width: 20, height: 20, borderRadius: 6 }}><Icon name="check" size={11} /></span> 우모가</div>
+          <div className="fs">우리가 모두 가능한 시간 · 만든이 @carpediemkosuk</div>
+        </div>
       </div>
 
       {toast && <div className="wm-toast">{toast}</div>}
@@ -646,46 +762,103 @@ function Setup({ onSave, current, onClose }) {
   );
 }
 
-/* ───────────────────────── Home ───────────────────────── */
+/* ───────────────────────── Landing ───────────────────────── */
+function HeroDemo() {
+  const lanes = [
+    { n: "지원", l: 6, w: 54 },
+    { n: "민재", l: 28, w: 60 },
+    { n: "하늘", l: 38, w: 34 },
+  ];
+  return (
+    <div className="wm-demo" aria-hidden="true">
+      <div className="hit" style={{ left: "calc(44px + (100% - 44px) * .38)", width: "calc((100% - 44px) * .22)" }}>
+        <span className="hitb">✓ 모두 가능 · 14:00</span>
+      </div>
+      {lanes.map((x, i) => (
+        <div className="lane" key={x.n}>
+          <span className="who">{x.n}</span>
+          <div className="tl">
+            <div className="bar" style={{ left: x.l + "%", width: x.w + "%", animationDelay: 0.25 + i * 0.18 + "s" }} />
+          </div>
+        </div>
+      ))}
+      <div className="ticks"><span>13:00</span><span>14:00</span><span>15:00</span><span>16:00</span></div>
+    </div>
+  );
+}
+
+function Feat({ icon, t, d }) {
+  return (
+    <section className="wm-cell wm-feat2 c4">
+      <span className="ic"><Icon name={icon} size={17} /></span>
+      <div>
+        <div className="t">{t}</div>
+        <div className="d">{d}</div>
+      </div>
+    </section>
+  );
+}
+
 function CodeEntry({ onEnter }) {
   const [active, setActive] = useState(null);
   const [openId, setOpenId] = useState(null);
   const [code, setCode] = useState("");
+  const [gcode, setGcode] = useState("");
+  const [going, setGoing] = useState(false);
   useEffect(() => {
     (async () => { try { const d = await apiPublicList(); setActive(d && d.ok ? d.meetings : []); } catch { setActive([]); } })();
   }, []);
   const toggle = (id) => { setOpenId((cur) => (cur === id ? null : id)); setCode(""); };
   const submit = (id) => onEnter(code, id);
+  const goGlobal = async () => {
+    if (!gcode.trim() || going) return;
+    setGoing(true);
+    await onEnter(gcode);
+    setGoing(false);
+  };
   return (
-    <div>
-      <div className="wm-hero">
-        <span className="wm-eyebrow">일정 조율 · 우모가</span>
-        <h2>우모<b>가</b></h2>
-        <div className="tag">우리가 모두 가능한 시간</div>
-        <p>여러 사람의 가능한 시간을 모아 <b>모두가 되는 시간</b>을 찾아주는 도구예요. 주최자가 올린 후보 중 가능한 시간을 체크하고, <b>후보에 없으면 내가 가능한 시간을 직접 추가</b>할 수도 있어요. 가장 많이 겹치는 시간이 자동으로 정리되고, 확정된 일정은 <b>구글 캘린더에 등록할 수 있어요</b>.</p>
-        <div className="wm-feats">
-          <span className="wm-feat"><span className="ic"><Icon name="cal" size={14} /></span> 시간 자동 취합</span>
-          <span className="wm-feat"><span className="ic"><Icon name="plus" size={14} /></span> 내 시간 추가</span>
-          <span className="wm-feat"><span className="ic"><Icon name="caladd" size={14} /></span> 캘린더 등록</span>
-        </div>
-      </div>
-      {active && active.length === 0 && (<div className="wm-brickempty">지금 진행 중인 모임이 없어요.</div>)}
-      {active && active.length > 0 && (
-        <div style={{ marginTop: 24 }}>
-          <div className="wm-sectionlabel">현재 투표 중인 모임 · 눌러서 코드 입력</div>
-          <div className="wm-bricklist">
-            {active.map((m, i) => (
-              <div key={m.id} className="wm-vcard">
-                <div className={"wm-vstripe" + (i % 2 ? " alt" : "")} />
+    <div className="wm-bento wm-landing">
+      <section className="wm-cell wm-hero c8">
+        <span className="wm-eyebrow"><Icon name="users" size={12} /> 그룹 일정 조율</span>
+        <h2>모두가 되는 시간,<br /><b>우모가</b>가 찾아드려요</h2>
+        <p className="lead">
+          가능한 시간에 체크만 하면 <b>가장 많이 겹치는 시간</b>이 실시간으로 정리됩니다.
+          후보에 없는 시간은 직접 추가하고, 확정되면 구글 캘린더까지 한 번에.
+        </p>
+        <HeroDemo />
+      </section>
+      <section className="wm-cell wm-entrycell c4">
+        <div className="lab">참여 코드 입장</div>
+        <h3>초대받으셨나요?</h3>
+        <p>주최자에게 받은 6자리 코드를 입력하세요. 링크로 받았다면 누르기만 하면 바로 열려요.</p>
+        <input
+          className="wm-input" value={gcode} maxLength={6} placeholder="예) A1B2C3"
+          onChange={(e) => setGcode(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && goGlobal()}
+        />
+        <button className="wm-btn go" disabled={!gcode.trim() || going} onClick={goGlobal}>{going ? "확인 중…" : "입장하기"}</button>
+      </section>
+      <Feat icon="cal" t="실시간 자동 취합" d="응답이 들어올 때마다 겹치는 시간이 순위로 정리돼요." />
+      <Feat icon="plus" t="내 시간 직접 추가" d="후보에 없는 시간도 참여자가 직접 제안할 수 있어요." />
+      <Feat icon="caladd" t="캘린더 등록" d="확정된 일정은 구글 캘린더에 바로 저장돼요." />
+      <section className="wm-cell c12">
+        <div className="wm-cellhead"><span className="ic"><Icon name="clock" size={14} /></span> 지금 투표 중인 모임</div>
+        <p className="wm-cellhint">모임을 누르고 참여 코드를 입력하면 입장할 수 있어요.</p>
+        {active === null && <div className="wm-spin" />}
+        {active && active.length === 0 && <div className="wm-brickempty">지금 진행 중인 모임이 없어요.</div>}
+        {active && active.length > 0 && (
+          <div className="wm-mrows">
+            {active.map((m) => (
+              <div key={m.id} className="wm-mrow">
                 <button className="wm-acc" onClick={() => toggle(m.id)}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
                     <div className="wm-titlerow">
                       {m.type && <TypeTag type={m.type} />}
-                      <h3 className="wm-mtitle">{m.title}</h3>
+                      <h3 className="wm-mtitle" style={{ fontSize: 15.5 }}>{m.title}</h3>
                     </div>
                     <span className="wm-caret">{openId === m.id ? "▲" : "▼"}</span>
                   </div>
-                  {m.deadline && <div className="wm-meta" style={{ marginTop: 8 }}><span className="wm-dl"><Icon name="clock" size={13} /> {remainText(m.deadline)}</span></div>}
+                  {m.deadline && <div className="wm-meta" style={{ marginTop: 7 }}><span className="wm-dl"><Icon name="clock" size={13} /> {remainText(m.deadline)}</span></div>}
                 </button>
                 {openId === m.id && (
                   <div className="wm-brickfoot">
@@ -698,37 +871,69 @@ function CodeEntry({ onEnter }) {
               </div>
             ))}
           </div>
-        </div>
-      )}
+        )}
+      </section>
     </div>
   );
 }
 
-function Home({ meetings, isAdmin, onAddHost, onOpen, onNew }) {
+function Stat({ label, value, tone, unit = "건" }) {
+  const v = useCountUp(value);
+  return (
+    <section className={"wm-cell wm-stat" + (tone ? " " + tone : "")}>
+      <div className="k"><span className="dot" /> {label}</div>
+      <div className="v">{v}<span className="u">{unit}</span></div>
+    </section>
+  );
+}
+
+function Home({ meetings, responses, isAdmin, onAddHost, onOpen, onNew }) {
   const [hn, setHn] = useState("");
   const [hp, setHp] = useState("");
   if (meetings === null) return <div className="wm-spin" />;
+  const resps = responses || [];
+  const stats = {
+    collect: meetings.filter((m) => { const k = statusOf(m).k; return k === "collect" || k === "soon"; }).length,
+    soon: meetings.filter((m) => statusOf(m).k === "soon").length,
+    done: meetings.filter((m) => statusOf(m).k === "done").length,
+    resp: resps.length,
+  };
   const AdminPanel = isAdmin ? (
-    <div className="wm-card" style={{ padding: 18, marginTop: 14 }}>
-      <div className="wm-label" style={{ marginBottom: 6 }}>다른 사람에게 일정 생성 권한 주기</div>
-      <p style={{ fontSize: 12.5, color: "var(--muted)", margin: "0 0 12px", lineHeight: 1.55 }}>이름과 비밀번호를 정해 알려주면, 그 사람은 자기 비밀번호로 로그인해 자신의 모임만 만들고 관리합니다.</p>
-      <div className="wm-slotrow">
+    <section className="wm-cell c12">
+      <div className="wm-cellhead"><span className="ic"><Icon name="user" size={14} /></span> 일정 생성 권한 주기</div>
+      <p className="wm-cellhint">이름과 비밀번호를 정해 알려주면, 그 사람은 자기 비밀번호로 로그인해 자신의 모임만 만들고 관리합니다.</p>
+      <div className="wm-slotrow" style={{ marginBottom: 0 }}>
         <input className="wm-input" placeholder="이름" value={hn} onChange={(e) => setHn(e.target.value)} />
         <input className="wm-input" placeholder="비밀번호" value={hp} onChange={(e) => setHp(e.target.value)} />
         <button className="wm-btn wm-ghost wm-sm" disabled={!hn.trim() || !hp.trim()} onClick={() => { onAddHost(hn.trim(), hp.trim()); setHn(""); setHp(""); }}>권한 부여</button>
       </div>
-    </div>
+    </section>
   ) : null;
   if (meetings.length === 0)
-    return (<div><div className="wm-card wm-empty"><h3>아직 잡은 모임이 없어요</h3><p>모임을 만들면 참여 코드와 링크가 나와요. 그걸 받은 사람만 해당 모임에 입장할 수 있습니다.</p><button className="wm-btn wm-pri" onClick={onNew}>첫 모임 만들기</button></div>{AdminPanel}</div>);
+    return (
+      <div className="wm-bento">
+        <section className="wm-cell wm-empty c12">
+          <h3>아직 잡은 모임이 없어요</h3>
+          <p>모임을 만들면 참여 코드와 링크가 나와요. 그걸 받은 사람만 해당 모임에 입장할 수 있습니다.</p>
+          <button className="wm-btn wm-pri" onClick={onNew}>첫 모임 만들기</button>
+        </section>
+        {AdminPanel}
+      </div>
+    );
   return (
-    <div>
-      <div className="wm-list">
-        {meetings.map((m) => {
-          const span = m.slots.length ? `${fmtSlot(m.slots[0].start).split(" ")[0]} 외 ${m.slots.length}개 후보` : "후보 없음";
-          const st = statusOf(m); const rt = remainText(m.deadline);
-          return (
-            <div key={m.id} className="wm-card wm-mcard" onClick={() => onOpen(m.id)}>
+    <div className="wm-bento">
+      <Stat label="진행 중" value={stats.collect} />
+      <Stat label="마감 임박" value={stats.soon} tone="amber" />
+      <Stat label="확정 완료" value={stats.done} tone="ink" />
+      <Stat label="누적 응답" value={stats.resp} tone="plain" unit="명" />
+      {meetings.map((m) => {
+        const span = m.slots.length ? `${fmtSlot(m.slots[0].start).split(" ")[0]} 외 ${m.slots.length}개 후보` : "후보 없음";
+        const st = statusOf(m); const rt = remainText(m.deadline);
+        const cnt = resps.filter((r) => r.mtgId === m.id).length;
+        return (
+          <section key={m.id} className="wm-cell wm-mcard2 c6" onClick={() => onOpen(m.id)}>
+            <div className={"wm-stripe " + st.k} />
+            <div className="inner">
               <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start" }}>
                 <div className="wm-titlerow">
                   {m.type && <TypeTag type={m.type} />}
@@ -738,14 +943,15 @@ function Home({ meetings, isAdmin, onAddHost, onOpen, onNew }) {
               </div>
               <div className="wm-meta">
                 <span><Icon name="cal" size={13} /> {span}</span>
+                <span><Icon name="users" size={13} /> 응답 {cnt}{m.expected ? "/" + m.expected : ""}명</span>
                 {m.location && <span><Icon name="pin" size={13} /> {m.location}</span>}
                 {rt && <span className={"wm-dl" + (st.k === "soon" ? " soon" : st.k === "closed" ? " over" : "")}><Icon name="clock" size={13} /> {rt}</span>}
                 {isAdmin && m.owner && <span><Icon name="user" size={13} /> {m.owner}</span>}
               </div>
             </div>
-          );
-        })}
-      </div>
+          </section>
+        );
+      })}
       {AdminPanel}
     </div>
   );
@@ -979,32 +1185,37 @@ function Detail({ mtg, responses, mode, hostPin, flash, askConfirm, onBack, onRe
         </div>
       )}
 
-      {isHost && (
-        <div className="wm-share">
-          <div className="codetag">이 모임 링크 — 참석자에게 공유하세요</div>
-          <div className="wm-linkrow" style={{ margin: "6px 0 4px" }}>
-            <input className="wm-input" readOnly value={link} onFocus={(e) => e.target.select()} />
-            <button className="wm-btn wm-pri wm-sm" onClick={copyLink}>링크 복사</button>
-          </div>
-          <div className="codetag" style={{ marginTop: 8 }}>또는 참여 코드 <b style={{ color: "var(--brand-dk)", letterSpacing: ".1em" }}>{mtg.code}</b></div>
-          <textarea className="wm-invite" rows={3} readOnly value={inviteText} onFocus={(e) => e.target.select()} style={{ marginTop: 10 }} />
-          <button className="wm-btn wm-ghost wm-sm" style={{ marginTop: 10 }} onClick={copyInvite}>초대 문구 복사</button>
-        </div>
-      )}
-
+      <div className="wm-bento">
       {finalSlot && (
-        <div className="wm-confirmbar">
+        <section className="wm-cell wm-confirmcell c12">
           <div className="lab">확정된 시간</div>
           <div className="big">{fmtSlot(finalSlot.start)} · {fmtRange(finalSlot.start, finalSlot.durationMin)}</div>
           <div className="row">
             <a className="wm-gcal" href={gcalUrl(mtg, finalSlot)} target="_blank" rel="noreferrer"><Icon name="caladd" size={15} /> 구글 캘린더에 추가</a>
             {isHost && <button className="wm-gcal" disabled={savingCal} onClick={saveToCal}>{savingCal ? "저장 중…" : <><Icon name="check" size={15} /> 내 캘린더에 저장</>}</button>}
-            {isHost && <button className="wm-btn wm-ghost wm-sm" onClick={() => setFinal(finalSlot.id)}>확정 취소</button>}
+            {isHost && <button className="wm-btn wm-ghost wm-sm" style={{ color: "#fff", background: "rgba(255,255,255,.12)", borderColor: "rgba(255,255,255,.3)" }} onClick={() => setFinal(finalSlot.id)}>확정 취소</button>}
           </div>
-        </div>
+        </section>
       )}
 
-      <div className="wm-card wm-sec" style={{ marginBottom: 16 }}>
+      {isHost && (
+        <section className="wm-cell wm-share2 c12">
+          <div className="codebox">
+            <span className="codetag">참여 코드</span>
+            <span className="wm-code">{mtg.code}</span>
+          </div>
+          <div className="linkcol">
+            <span className="codetag">이 모임 링크 — 참석자에게 공유하세요</span>
+            <div className="wm-linkrow">
+              <input className="wm-input" readOnly value={link} onFocus={(e) => e.target.select()} />
+              <button className="wm-btn wm-pri wm-sm" onClick={copyLink}>링크 복사</button>
+              <button className="wm-btn wm-ghost wm-sm" onClick={copyInvite}>초대 문구 복사</button>
+            </div>
+          </div>
+        </section>
+      )}
+
+      <section className="wm-cell wm-sec c6">
         <h2>내 가능한 시간 등록</h2>
         <p className="hint">이름을 적고 가능한 시간을 모두 골라 주세요. 같은 이름으로 다시 저장하면 수정됩니다.</p>
         {locked && <div className="wm-lockmsg" style={{ marginBottom: 14 }}>응답이 마감되어 더 이상 등록할 수 없어요.</div>}
@@ -1036,10 +1247,10 @@ function Detail({ mtg, responses, mode, hostPin, flash, askConfirm, onBack, onRe
         <div className="wm-field" style={{ marginTop: 14, marginBottom: 0 }}>
           <input className="wm-input" value={note} onChange={(e) => setNote(e.target.value)} placeholder="메모 (선택) — 예) 오전만 가능" />
         </div>
-        <button className="wm-btn wm-pri" style={{ marginTop: 16, opacity: locked || busy ? 0.45 : 1 }} disabled={locked || busy} onClick={submit}>{busy ? "저장 중…" : "참여 가능 일정 선택 완료"}</button>
-      </div>
+        <button className="wm-btn wm-pri" style={{ marginTop: 16, width: "100%", opacity: locked || busy ? 0.45 : 1 }} disabled={locked || busy} onClick={submit}>{busy ? "저장 중…" : "참여 가능 일정 선택 완료"}</button>
+      </section>
 
-      <div className="wm-card wm-sec">
+      <section className="wm-cell wm-sec c6">
         <h2>취합 결과 {total > 0 && <span style={{ color: "var(--muted)", fontWeight: 500 }}>· 다 되는 시간 순</span>}</h2>
         {total === 0 ? (
           <p className="hint" style={{ marginBottom: 0 }}>아직 응답이 없어요. 위에서 가능 시간을 등록하거나, 참여 코드를 참석자에게 공유하세요.</p>
@@ -1077,6 +1288,7 @@ function Detail({ mtg, responses, mode, hostPin, flash, askConfirm, onBack, onRe
           </div>
         )}
         <div className="wm-note">입력한 일정은 구글 시트에 저장되어 모든 참여자에게 자동 취합됩니다(8초마다 갱신).</div>
+      </section>
       </div>
     </div>
   );
