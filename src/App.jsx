@@ -261,7 +261,7 @@ const CSS = `
 @media (max-width:640px){ .wm-sub { display:none; } }
 
 /* ── buttons ── */
-.wm-btn { border:none; border-radius:12px; font-family:inherit; font-weight:650; cursor:pointer;
+.wm-btn { border:none; border-radius:12px; font-family:inherit; font-weight:650; cursor:pointer; white-space:nowrap;
   font-size:14px; padding:11px 16px; transition:transform .08s ease, filter .15s, background .15s, border-color .15s; letter-spacing:-.01em; }
 .wm-btn:active { transform:translateY(1px); }
 .wm-btn:focus-visible { outline:2px solid var(--brand); outline-offset:2px; }
@@ -354,25 +354,40 @@ const CSS = `
 .wm-join .wm-input { flex:1; text-transform:uppercase; letter-spacing:.12em; font-weight:650; }
 .wm-brickempty { border:1px dashed var(--line); border-radius:14px; padding:34px 20px; text-align:center; color:var(--muted); font-size:13.5px; background:var(--soft); }
 
-/* ── 대시보드 통계 ── */
-.wm-stat { padding:18px 20px; }
-.wm-stat .k { font-size:12px; font-weight:700; color:var(--muted); letter-spacing:-.01em; display:flex; align-items:center; gap:6px; }
-.wm-stat .k .dot { width:7px; height:7px; border-radius:50%; background:var(--brand); flex:none; }
-.wm-stat.amber .k .dot { background:var(--amber); }
-.wm-stat.ink .k .dot { background:var(--ink); }
-.wm-stat.plain .k .dot { background:var(--faint); }
-.wm-stat .v { font-size:31px; font-weight:800; letter-spacing:-.045em; margin-top:5px; font-variant-numeric:tabular-nums; line-height:1; }
-.wm-stat .u { font-size:13px; font-weight:650; color:var(--faint); margin-left:2px; }
-@media (max-width:880px){ .wm-stat { padding:15px 16px; } .wm-stat .v { font-size:26px; } }
+/* ── 대시보드 통계 스트립 ── */
+.wm-statstrip { padding:0; }
+.wm-statstrip .grid { display:grid; grid-template-columns:repeat(4,1fr); }
+.wm-statstrip .st { padding:18px 22px; border-left:1px solid var(--line); min-width:0; }
+.wm-statstrip .st:first-child { border-left:none; }
+.wm-statstrip .k { font-size:12px; font-weight:700; color:var(--muted); letter-spacing:-.01em; display:flex; align-items:center; gap:6px; white-space:nowrap; }
+.wm-statstrip .k .dot { width:7px; height:7px; border-radius:50%; background:var(--brand); flex:none; }
+.wm-statstrip .st.amber .k .dot { background:var(--amber); }
+.wm-statstrip .st.ink .k .dot { background:var(--ink); }
+.wm-statstrip .st.plain .k .dot { background:var(--faint); }
+.wm-statstrip .v { font-size:30px; font-weight:800; letter-spacing:-.045em; margin-top:6px; font-variant-numeric:tabular-nums; line-height:1; }
+.wm-statstrip .u { font-size:13px; font-weight:650; color:var(--faint); margin-left:3px; }
+@media (max-width:640px){
+  .wm-statstrip .grid { grid-template-columns:1fr 1fr; }
+  .wm-statstrip .st { padding:15px 18px; }
+  .wm-statstrip .st:nth-child(3) { border-left:none; }
+  .wm-statstrip .st:nth-child(n+3) { border-top:1px solid var(--line); }
+  .wm-statstrip .v { font-size:25px; }
+}
+
+/* ── 섹션 라벨 ── */
+.wm-seclab { grid-column:1 / -1; display:flex; align-items:center; gap:10px; font-size:12.5px; font-weight:750; color:var(--muted); letter-spacing:-.01em; margin:8px 2px -4px; }
+.wm-seclab b { color:var(--brand-dk); font-variant-numeric:tabular-nums; }
+.wm-seclab::after { content:""; flex:1; height:1px; background:linear-gradient(90deg, var(--line), transparent); }
 
 /* ── 모임 카드 (대시보드) ── */
-.wm-mcard2 { cursor:pointer; padding:0; transition:transform .14s ease, box-shadow .14s ease, border-color .14s ease; }
+.wm-mcard2 { cursor:pointer; padding:0; display:flex; flex-direction:column; transition:transform .14s ease, box-shadow .14s ease, border-color .14s ease; }
 .wm-mcard2:hover { transform:translateY(-2px); box-shadow:var(--e2); border-color:color-mix(in srgb, var(--brand) 30%, var(--line)); }
-.wm-stripe { height:3px; background:var(--grad); }
+.wm-stripe { height:3px; background:var(--grad); flex:none; }
 .wm-stripe.soon { background:linear-gradient(90deg,#E0902B,#C2603C); }
 .wm-stripe.done { background:var(--ink); }
 .wm-stripe.closed { background:var(--line); }
-.wm-mcard2 .inner { padding:17px 19px; }
+.wm-mcard2 .inner { padding:17px 19px; flex:1; display:flex; flex-direction:column; }
+.wm-mcard2 .wm-meta { margin-top:auto; padding-top:10px; }
 .wm-titlerow { display:flex; align-items:center; gap:8px; flex-wrap:wrap; min-width:0; }
 .wm-mtitle { font-size:16.5px; font-weight:750; letter-spacing:-.02em; margin:0; }
 .wm-type { display:inline-flex; align-items:center; gap:5px; font-size:11px; font-weight:700; padding:4px 9px; border-radius:8px; letter-spacing:-.01em; background:rgba(var(--brand-rgb),.1); color:var(--brand-dk); white-space:nowrap; }
@@ -880,9 +895,22 @@ function CodeEntry({ onEnter }) {
 function Stat({ label, value, tone, unit = "건" }) {
   const v = useCountUp(value);
   return (
-    <section className={"wm-cell wm-stat" + (tone ? " " + tone : "")}>
+    <div className={"st" + (tone ? " " + tone : "")}>
       <div className="k"><span className="dot" /> {label}</div>
       <div className="v">{v}<span className="u">{unit}</span></div>
+    </div>
+  );
+}
+
+function StatStrip({ stats }) {
+  return (
+    <section className="wm-cell wm-statstrip c12">
+      <div className="grid">
+        <Stat label="진행 중" value={stats.collect} />
+        <Stat label="마감 임박" value={stats.soon} tone="amber" />
+        <Stat label="확정 완료" value={stats.done} tone="ink" />
+        <Stat label="누적 응답" value={stats.resp} tone="plain" unit="명" />
+      </div>
     </section>
   );
 }
@@ -905,7 +933,7 @@ function Home({ meetings, responses, isAdmin, onAddHost, onOpen, onNew }) {
       <div className="wm-slotrow" style={{ marginBottom: 0 }}>
         <input className="wm-input" placeholder="이름" value={hn} onChange={(e) => setHn(e.target.value)} />
         <input className="wm-input" placeholder="비밀번호" value={hp} onChange={(e) => setHp(e.target.value)} />
-        <button className="wm-btn wm-ghost wm-sm" disabled={!hn.trim() || !hp.trim()} onClick={() => { onAddHost(hn.trim(), hp.trim()); setHn(""); setHp(""); }}>권한 부여</button>
+        <button className="wm-btn wm-ghost wm-sm" style={{ flex: "none" }} disabled={!hn.trim() || !hp.trim()} onClick={() => { onAddHost(hn.trim(), hp.trim()); setHn(""); setHp(""); }}>권한 부여</button>
       </div>
     </section>
   ) : null;
@@ -922,10 +950,8 @@ function Home({ meetings, responses, isAdmin, onAddHost, onOpen, onNew }) {
     );
   return (
     <div className="wm-bento">
-      <Stat label="진행 중" value={stats.collect} />
-      <Stat label="마감 임박" value={stats.soon} tone="amber" />
-      <Stat label="확정 완료" value={stats.done} tone="ink" />
-      <Stat label="누적 응답" value={stats.resp} tone="plain" unit="명" />
+      <StatStrip stats={stats} />
+      <div className="wm-seclab">내 모임 <b>{meetings.length}</b>건</div>
       {meetings.map((m) => {
         const span = m.slots.length ? `${fmtSlot(m.slots[0].start).split(" ")[0]} 외 ${m.slots.length}개 후보` : "후보 없음";
         const st = statusOf(m); const rt = remainText(m.deadline);
