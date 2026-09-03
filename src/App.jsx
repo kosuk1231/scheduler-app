@@ -132,6 +132,7 @@ function meetingUrl(code) {
 const WD_MAP = { "일": 0, "월": 1, "화": 2, "수": 3, "목": 4, "금": 5, "토": 6 };
 const _mins = (t) => t.h * 60 + t.m;
 const hhmm = (m) => pad(Math.floor(m / 60)) + ":" + pad(m % 60);
+const WORK_START = 9 * 60, WORK_END = 18 * 60; // 회의는 09~18시 사이에서만 잡는다
 
 // 대화(카톡 등)에서 발신 시각을 걸러내고, 참여자별 "가능 시간 구간"을 읽는다
 function parseChatText(text, todayDate) {
@@ -178,17 +179,22 @@ function parseBodySpans(body, H) {
       const amOnly = /오전만/.test(seg), pmOnly = /오후만/.test(seg);
       let from = null, to = null;
       if (times.length >= 2) { from = _mins(times[0]); to = _mins(times[1]); }
-      else if (times.length === 1 && /이후|부터|넘어서|지나서/.test(seg)) { from = _mins(times[0]); to = 22 * 60; }
-      else if (times.length === 1 && /이전|까지|전에/.test(seg)) { from = 8 * 60; to = _mins(times[0]); }
+      else if (times.length === 1 && /이후|부터|넘어서|지나서/.test(seg)) { from = _mins(times[0]); to = WORK_END; }
+      else if (times.length === 1 && /이전|까지|전에/.test(seg)) { from = WORK_START; to = _mins(times[0]); }
       else if (times.length === 1) { from = _mins(times[0]); to = _mins(times[0]) + 60; }
       else if (amOnly) { from = 9 * 60; to = 12 * 60; }
       else if (pmOnly) { from = 13 * 60; to = 18 * 60; }
-      else if (whole) { from = 9 * 60; to = 18 * 60; }
+      else if (whole) { from = WORK_START; to = WORK_END; }
       if (from == null) continue;
       if (to <= from) to = from + 60;
+      if (!neg) { // 가능 구간은 업무시간(09~18) 안으로 맞춘다
+        from = Math.max(from, WORK_START); to = Math.min(to, WORK_END);
+        if (to <= from) continue;
+      }
       out.push({ date: useDate, from, to, neg });
     }
   }
+  out.sort((a, b) => a.date.localeCompare(b.date) || a.from - b.from);
   return out;
 }
 
@@ -216,7 +222,7 @@ function overlapSlots(people, durationMin = 60, stepMin = 30, limit = 8) {
   people.forEach((p) => p.spans.forEach((s) => dates.add(s.date)));
   const cands = [];
   for (const date of [...dates].sort()) {
-    for (let t = 8 * 60; t + durationMin <= 22 * 60; t += stepMin) {
+    for (let t = WORK_START; t + durationMin <= WORK_END; t += stepMin) {
       const a = t, b = t + durationMin;
       const yes = [], no = [];
       for (const p of people) {
@@ -230,6 +236,7 @@ function overlapSlots(people, durationMin = 60, stepMin = 30, limit = 8) {
       cands.push({ date, from: a, to: b, count: yes.length, yes, no });
     }
   }
+  // 많이 겹치는 순으로 고른 뒤, 최종 결과는 일시 순으로 정렬해 돌려준다
   cands.sort((x, y) => y.count - x.count || x.date.localeCompare(y.date) || x.from - y.from);
   const picked = [];
   for (const c of cands) {
@@ -238,6 +245,7 @@ function overlapSlots(people, durationMin = 60, stepMin = 30, limit = 8) {
     picked.push(c);
     if (picked.length >= limit) break;
   }
+  picked.sort((x, y) => x.date.localeCompare(y.date) || x.from - y.from);
   return picked;
 }
 
